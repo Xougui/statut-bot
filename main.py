@@ -2,12 +2,12 @@ import discord
 import pytz
 import datetime
 import asyncio
-import PARAM # Assurez-vous que ce fichier existe et contient les variables
+import PARAM # Importe les variables de configuration depuis le fichier PARAM.py
 import platform
 import os
 import psutil
 import logging
-from dotenv import load_dotenv
+from dotenv import load_dotenv # Utilisé pour charger les variables d'environnement (le token) depuis un fichier .env
 from pydactyl import PterodactylClient # Peut être retiré si Panel.py gère tout
 from discord.ext import commands
 from discord import app_commands
@@ -20,8 +20,7 @@ EXTENSIONS = [
     'cog.statut'
     ]
 
-# Remplacez par le token de votre bot et l'ID du bot surveillé
-# Ces variables sont maintenant utilisées par les cogs, mais assurez-vous qu'elles sont définies quelque part.
+# --- CONFIGURATION (chargée depuis PARAM.py) ---
 BOT_ID = PARAM.BOT_ID
 CHANNEL_ID = PARAM.CHANNEL_ID
 MESSAGE_ID = PARAM.MESSAGE_ID
@@ -36,8 +35,8 @@ tree = app_commands.CommandTree(client)
 
 couleur = PARAM.couleur
 owners = PARAM.owners
-load_dotenv()
-token = os.getenv('token')
+load_dotenv() # Charge les variables du fichier .env
+token = os.getenv('token') # Récupère le token du bot depuis les variables d'environnement
 
 tz = pytz.timezone('Europe/Paris')
 

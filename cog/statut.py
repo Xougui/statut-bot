@@ -4,18 +4,17 @@ import datetime
 import pytz
 import asyncio
 import logging
-import PARAM
+import PARAM # Importe les variables de configuration depuis le fichier PARAM.py
 
 # Configuration du logger pour afficher les messages de rate limit
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger('discord')
 
-# Importation des variables globales depuis PARAM.py
+# --- CONFIGURATION (chargée depuis PARAM.py) ---
 BOT_ID = PARAM.BOT_ID
 CHANNEL_ID = PARAM.CHANNEL_ID
 MESSAGE_ID = PARAM.MESSAGE_ID
 LOGS_CHANNEL_ID = PARAM.LOGS_CHANNEL_ID
-owners = PARAM.owners  # Liste des IDs des propriétaires du bot
 
 tz = pytz.timezone('Europe/Paris') # Définition du fuseau horaire
 
@@ -100,7 +99,13 @@ class Statut(commands.Cog):
             # Bot cible en ligne
             if "🔴" in channel.name or "offline" in channel.name:
                 # Si le canal indique hors ligne, le met à jour
-                embed = discord.Embed(title="<a:online:1346871720845348864>・**Bot en ligne**", description=f"Le bot **Lyxios** est **en ligne** et toutes ses commandes et modules sont opérationnels !\n> Check ça pour savoir si le bot est `offline` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi .", color=0x00ff00)
+                # --- CONFIGURATION DU MESSAGE ---
+                # Vous pouvez modifier le nom du bot ("Lyxios") et le texte dans la description ci-dessous.
+                embed = discord.Embed(
+                    title="<a:online:1346871720845348864>・**Bot en ligne**",
+                    description=f"Le bot **Lyxios** est **en ligne** et toutes ses commandes et modules sont opérationnels !\n> Check ça pour savoir si le bot est `offline` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi .",
+                    color=0x00ff00
+                )
                 embed.set_footer(text=f"Mis à jour le: {maj}")
                 await message.edit(content="", embed=embed)
 
@@ -114,7 +119,13 @@ class Statut(commands.Cog):
             # Bot cible hors ligne
             if "🟢" in channel.name or "online" in channel.name:
                 # Si le canal indique en ligne, le met à jour
-                embed = discord.Embed(title="<a:offline:1346871717938729062>・**Bot hors ligne**", description=f"Le bot **Lyxios** est **hors ligne**.\n\n> Ne vous inquiétez pas, le bot reviendra en ligne !\n> Check ça pour savoir si le bot est `online` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi\n-# Merci de votre patience.", color=0xff0000)
+                # --- CONFIGURATION DU MESSAGE ---
+                # Vous pouvez modifier le nom du bot ("Lyxios") et le texte dans la description ci-dessous.
+                embed = discord.Embed(
+                    title="<a:offline:1346871717938729062>・**Bot hors ligne**",
+                    description=f"Le bot **Lyxios** est **hors ligne**.\n\n> Ne vous inquiétez pas, le bot reviendra en ligne !\n> Check ça pour savoir si le bot est `online` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi\n-# Merci de votre patience.",
+                    color=0xff0000
+                )
                 embed.set_footer(text=f"Mis à jour le: {maj}")
                 await message.edit(content="", embed=embed)
 
@@ -123,8 +134,12 @@ class Statut(commands.Cog):
                     embed_logs.set_footer(text=f"Mis à jour le: {maj}")
                     await logs_channel.send(embed=embed_logs)
                 
+                # --- CONFIGURATION DU PING ---
+                # Remplacez l'ID ci-dessous par l'ID du rôle que vous souhaitez notifier
+                # lorsque le bot passe hors ligne.
+                # Pour obtenir l'ID d'un rôle : Paramètres du serveur > Rôles > Clic droit sur le rôle > Copier l'ID du rôle.
                 # Envoi d'un ping et suppression après un court délai
-                ping = await channel.send(content="<@&1350429004032770068>")
+                ping = await channel.send(content="<@&1350429004032770068>") # <@&ID_DU_ROLE>
                 await asyncio.sleep(1)
                 await ping.delete()
 
@@ -171,7 +186,13 @@ class Statut(commands.Cog):
 
         if status.lower() == "on":
             if "🔴" in channel.name or "offline" in channel.name:
-                embed = discord.Embed(title="<a:online:1346871720845348864>・**Bot en ligne**", description=f"Le bot **Lyxios** est **en ligne** et toutes ses commandes et modules sont opérationnels !\n> Check ça pour savoir si le bot est `offline` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi .", color=0x00ff00)
+                # --- CONFIGURATION DU MESSAGE (commande manuelle) ---
+                # Vous pouvez modifier le nom du bot ("Lyxios") et le texte dans la description ci-dessous.
+                embed = discord.Embed(
+                    title="<a:online:1346871720845348864>・**Bot en ligne**",
+                    description=f"Le bot **Lyxios** est **en ligne** et toutes ses commandes et modules sont opérationnels !\n> Check ça pour savoir si le bot est `offline` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi .",
+                    color=0x00ff00
+                )
                 embed.set_footer(text=f"Mis à jour le: {maj}")
                 await message.edit(content="", embed=embed)
 
@@ -188,7 +209,13 @@ class Statut(commands.Cog):
                 await m2.delete()
         elif status.lower() == "off":
             if "🟢" in channel.name or "online" in channel.name:
-                embed = discord.Embed(title="<a:offline:1346871717938729062>・**Bot hors ligne**", description=f"Le bot **Lyxios** est **hors ligne**.\n\n> Ne vous inquiétez pas, le bot reviendra en ligne !\n> Check ça pour savoir si le bot est `online` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi\n-# Merci de votre patience.", color=0xff0000)
+                # --- CONFIGURATION DU MESSAGE (commande manuelle) ---
+                # Vous pouvez modifier le nom du bot ("Lyxios") et le texte dans la description ci-dessous.
+                embed = discord.Embed(
+                    title="<a:offline:1346871717938729062>・**Bot hors ligne**",
+                    description=f"Le bot **Lyxios** est **hors ligne**.\n\n> Ne vous inquiétez pas, le bot reviendra en ligne !\n> Check ça pour savoir si le bot est `online` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi\n-# Merci de votre patience.",
+                    color=0xff0000
+                )
                 embed.set_footer(text=f"Mis à jour le: {maj}")
                 await message.edit(content="", embed=embed)
 
@@ -197,7 +224,9 @@ class Statut(commands.Cog):
                     embed_logs.set_footer(text=f"Mis à jour le: {maj}")
                     await logs.send(embed=embed_logs)
 
-                ping = await channel.send(content="<@&1350429004032770068>")
+                # --- CONFIGURATION DU PING (commande manuelle) ---
+                # Remplacez l'ID ci-dessous par l'ID du rôle que vous souhaitez notifier.
+                ping = await channel.send(content="<@&1350429004032770068>") # <@&ID_DU_ROLE>
                 await asyncio.sleep(1)
                 await ping.delete()
                 
