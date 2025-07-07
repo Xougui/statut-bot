@@ -185,57 +185,47 @@ class Statut(commands.Cog):
         status_changed = False # Pour éviter les messages redondants
 
         if status.lower() == "on":
-            if "🔴" in channel.name or "offline" in channel.name:
-                # --- CONFIGURATION DU MESSAGE (commande manuelle) ---
-                # Vous pouvez modifier le nom du bot ("Lyxios") et le texte dans la description ci-dessous.
-                embed = discord.Embed(
-                    title="<a:online:1346871720845348864>・**Bot en ligne**",
-                    description=f"Le bot **Lyxios** est **en ligne** et toutes ses commandes et modules sont opérationnels !\n> Check ça pour savoir si le bot est `offline` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi .",
-                    color=0x00ff00
-                )
-                embed.set_footer(text=f"Mis à jour le: {maj}")
-                await message.edit(content="", embed=embed)
+            # --- CONFIGURATION DU MESSAGE (commande manuelle) ---
+            # Vous pouvez modifier le nom du bot ("Lyxios") et le texte dans la description ci-dessous.
+            embed = discord.Embed(
+                title="<a:online:1346871720845348864>・**Bot en ligne**",
+                description=f"Le bot **Lyxios** est **en ligne** et toutes ses commandes et modules sont opérationnels !\n> Check ça pour savoir si le bot est `offline` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi .",
+                color=0x00ff00
+            )
+            embed.set_footer(text=f"Mis à jour le: {maj}")
+            await message.edit(content="", embed=embed)
 
-                if logs:
-                    embed_logs = discord.Embed(title="<a:online:1346871720845348864>・**Bot en ligne**", description="Le bot est **en ligne**", color=0x00ff00)
-                    embed_logs.set_footer(text=f"Mis à jour le: {maj}")
-                    await logs.send(embed=embed_logs)
+            if logs:
+                embed_logs = discord.Embed(title="<a:online:1346871720845348864>・**Bot en ligne**", description="Le bot est **en ligne**", color=0x00ff00)
+                embed_logs.set_footer(text=f"Mis à jour le: {maj}")
+                await logs.send(embed=embed_logs)
 
-                await self._change_channel_name_with_retry(channel, "═🟢・online")
-                status_changed = True
-            else:
-                m2 = await ctx.send("Le bot est déjà affiché comme étant en ligne.", ephemeral=True)
-                await asyncio.sleep(5)
-                await m2.delete()
+            await self._change_channel_name_with_retry(channel, "═🟢・online")
+            status_changed = True
         elif status.lower() == "off":
-            if "🟢" in channel.name or "online" in channel.name:
-                # --- CONFIGURATION DU MESSAGE (commande manuelle) ---
-                # Vous pouvez modifier le nom du bot ("Lyxios") et le texte dans la description ci-dessous.
-                embed = discord.Embed(
-                    title="<a:offline:1346871717938729062>・**Bot hors ligne**",
-                    description=f"Le bot **Lyxios** est **hors ligne**.\n\n> Ne vous inquiétez pas, le bot reviendra en ligne !\n> Check ça pour savoir si le bot est `online` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi\n-# Merci de votre patience.",
-                    color=0xff0000
-                )
-                embed.set_footer(text=f"Mis à jour le: {maj}")
-                await message.edit(content="", embed=embed)
+            # --- CONFIGURATION DU MESSAGE (commande manuelle) ---
+            # Vous pouvez modifier le nom du bot ("Lyxios") et le texte dans la description ci-dessous.
+            embed = discord.Embed(
+                title="<a:offline:1346871717938729062>・**Bot hors ligne**",
+                description=f"Le bot **Lyxios** est **hors ligne**.\n\n> Ne vous inquiétez pas, le bot reviendra en ligne !\n> Check ça pour savoir si le bot est `online` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi\n-# Merci de votre patience.",
+                color=0xff0000
+            )
+            embed.set_footer(text=f"Mis à jour le: {maj}")
+            await message.edit(content="", embed=embed)
 
-                if logs:
-                    embed_logs = discord.Embed(title="<a:offline:1346871717938729062>・**Bot hors ligne**", description="Le bot est **hors ligne**", color=0xff0000)
-                    embed_logs.set_footer(text=f"Mis à jour le: {maj}")
-                    await logs.send(embed=embed_logs)
+            if logs:
+                embed_logs = discord.Embed(title="<a:offline:1346871717938729062>・**Bot hors ligne**", description="Le bot est **hors ligne**", color=0xff0000)
+                embed_logs.set_footer(text=f"Mis à jour le: {maj}")
+                await logs.send(embed=embed_logs)
 
-                # --- CONFIGURATION DU PING (commande manuelle) ---
-                # Remplacez l'ID ci-dessous par l'ID du rôle que vous souhaitez notifier.
-                ping = await channel.send(content="<@&1350429004032770068>") # <@&ID_DU_ROLE>
-                await asyncio.sleep(1)
-                await ping.delete()
-                
-                await self._change_channel_name_with_retry(channel, "═🔴・offline")
-                status_changed = True
-            else:
-                m2 = await ctx.send("Le bot est déjà affiché comme étant hors ligne.", ephemeral=True)
-                await asyncio.sleep(5)
-                await m2.delete()
+            # --- CONFIGURATION DU PING (commande manuelle) ---
+            # Remplacez l'ID ci-dessous par l'ID du rôle que vous souhaitez notifier.
+            ping = await channel.send(content="<@&1350429004032770068>") # <@&ID_DU_ROLE>
+            await asyncio.sleep(1)
+            await ping.delete()
+            
+            await self._change_channel_name_with_retry(channel, "═🔴・offline")
+            status_changed = True
         else:
             m3 = await ctx.send("Statut invalide. Veuillez utiliser `online` ou `offline`.", ephemeral=True)
             await asyncio.sleep(5)
