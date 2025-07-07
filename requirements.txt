@@ -1,0 +1,5 @@
+discord.py==2.5.2
+Flask==3.1.1
+psutil==7.0.0
+py_dactyl==2.0.4
+pytz==2025.2
