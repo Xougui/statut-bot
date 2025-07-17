@@ -14,11 +14,30 @@ from discord import app_commands
 from discord.ext import tasks, commands
 from flask import Flask
 from threading import Thread
+import sys
+import traceback
 
 # Importation des cogs
 EXTENSIONS = [
     'cog.statut'
     ]
+
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+for handler in logger.handlers[:]:
+    logger.removeHandler(handler)
+
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(name)s %(message)s'))
+logger.addHandler(console_handler)
+
+
+logging.getLogger('discord').propagate = False
+logging.getLogger('discord.http').propagate = False
+logging.getLogger('aiohttp').propagate = False
+
 
 # --- CONFIGURATION (chargée depuis PARAM.py) ---
 BOT_ID = PARAM.BOT_ID
@@ -142,6 +161,55 @@ async def ping(interaction: discord.Interaction):
     )
     await interaction.response.send_message(embed=embed)
     
+    
+@bot.tree.command(name="sync", description="[🤖 Dev ] Recharge les extensions et synchronise les commandes slash.")
+async def sync(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)  # Répondre immédiatement pour éviter le timeout
+    # Vérifie si l'utilisateur est un propriétaire du bot
+    if interaction.user.id in owners:
+        await interaction.followup.send("🔄 Démarrage de la synchronisation des commandes et du rechargement des extensions...", ephemeral=True)
+        try:
+            # Décharger toutes les extensions avant de les recharger
+            for extension in EXTENSIONS:
+                try:
+                    await bot.unload_extension(extension)
+                except commands.ExtensionNotLoaded:
+                    print(f"Extension {extension} n'était pas chargée, pas besoin de la décharger.")
+                except Exception as e:
+                    print(f"Erreur lors du déchargement de l'extension {extension}: {e}")
+                    await interaction.followup.send(f"❌ Erreur lors du déchargement de l'extension {extension}: {e}", ephemeral=True)
+                    alert_id_owner = 946098490654740580
+                    owner_dm = await bot.fetch_user(alert_id_owner)
+                    await owner_dm.send(f"⚠️ Une erreur est survenue lors du déchargement de l'extension {extension}: {e}")
+                    traceback.print_exc(file=sys.stderr)
+
+            # Recharger chaque extension
+            for extension in EXTENSIONS:
+                try:
+                    await bot.load_extension(extension)
+                except Exception as e:
+                    print(f"Erreur lors du chargement de l'extension {extension}: {e}")
+                    await interaction.followup.send(f"❌ Erreur lors du chargement de l'extension {extension}: {e}", ephemeral=True)
+                    alert_id_owner = 946098490654740580
+                    owner_dm = await bot.fetch_user(alert_id_owner)
+                    await owner_dm.send(f"⚠️ Une erreur est survenue lors du chargement de l'extension {extension}: {e}")
+                    traceback.print_exc(file=sys.stderr)
+
+            # Synchronise les commandes slash avec Discord
+            synced = await bot.tree.sync()
+            await interaction.followup.send(f"✅ Synchronisation complète. {len(synced)} commandes slash synchronisées et extensions rechargées.", ephemeral=True)
+            print(f"Synchronisation complète. {len(synced)} commandes slash synchronisées et extensions rechargées.")
+
+            # Met à jour les fichiers JSON des commandes
+            print("Données des commandes mises à jour.")
+
+        except Exception as e:
+            await interaction.followup.send(f"❌ Une erreur est survenue pendant la synchronisation : {e}", ephemeral=True)
+            print(f"Erreur globale pendant la synchronisation : {e}")
+            traceback.print_exc(file=sys.stderr)
+    else:
+        await interaction.followup.send(f"<:error2:1347966692915023952>・Vous devez faire partie du personnel de Lyxios pour pouvoir utiliser cette commande.", ephemeral=True)
+    
 #---------------------------------------------------------------------------------------------------------------
 #---------------------------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------------------------
@@ -155,10 +223,10 @@ def run_flask_server():
 
     @flask_app.route('/')
     def home():
-        return "Bot is alive!", 200
+        return "Manage Bot is alive!", 200
 
     try:
-        flask_app.run(host='0.0.0.0', port=6198, debug=False)
+        flask_app.run(host='0.0.0.0', port=20170, debug=False)
     except Exception as e:
         print(f"Erreur lors du démarrage du serveur Flask : {e}")
 
@@ -189,6 +257,6 @@ async def on_ready():
     server_thread = Thread(target=run_flask_server)
     server_thread.daemon = True
     server_thread.start()
-    print(f"Serveur Flask démarré sur http://0.0.0.0:6198")
+    print(f"Serveur Flask démarré sur http://145.239.69.111:20170")
 
 bot.run(token)
