@@ -11,7 +11,7 @@ from dotenv import load_dotenv # Utilisé pour charger les variables d'environne
 from pydactyl import PterodactylClient # Peut être retiré si Panel.py gère tout
 from discord.ext import commands
 from discord import app_commands
-from discord.ext import tasks, commands
+from discord.ext import tasks # Importation de tasks pour les boucles
 from flask import Flask
 from threading import Thread
 import sys
@@ -19,7 +19,8 @@ import traceback
 
 # Importation des cogs
 EXTENSIONS = [
-    'cog.statut'
+    'cog.statut',
+    'cog.panel',
     ]
 
 
@@ -42,15 +43,14 @@ logging.getLogger('aiohttp').propagate = False
 # --- CONFIGURATION (chargée depuis PARAM.py) ---
 BOT_ID = PARAM.BOT_ID
 CHANNEL_ID = PARAM.CHANNEL_ID
-MESSAGE_ID = PARAM.MESSAGE_ID
+# MESSAGE_ID n'est plus nécessaire ici, il est géré par panel.py
 LOGS_CHANNEL_ID = PARAM.LOGS_CHANNEL_ID
 
 intents = discord.Intents.all()
-intents.presences = True
+
 bot = commands.Bot(command_prefix='s%', intents=intents)
 
-client = discord.Client(intents=intents)
-tree = app_commands.CommandTree(client)
+
 
 couleur = PARAM.couleur
 owners = PARAM.owners
@@ -138,13 +138,13 @@ async def ping(interaction: discord.Interaction):
     users = sum(guild.member_count for guild in bot.guilds)
     commands_to_exclude = ["help", "start"]
     prefix_commands = [cmd for cmd in bot.commands if cmd.name not in commands_to_exclude]
-    command_count = len(prefix_commands)
+    command_count = len(prefix_commands) # Cette variable n'est pas utilisée dans l'embed final
     app_command_count = len(bot.tree.get_commands())
-    start_time = datetime.datetime.now(datetime.timezone.utc)
+    start_time_ping = datetime.datetime.now(datetime.timezone.utc) # Renommé pour éviter conflit avec bot_start_time
     message = await interaction.channel.send('Pinging...')
-    end_time = datetime.datetime.now(datetime.timezone.utc)
+    end_time_ping = datetime.datetime.now(datetime.timezone.utc) # Renommé
     await message.delete()
-    full_circle_latency = round((end_time - start_time).total_seconds() * 1000)
+    full_circle_latency = round((end_time_ping - start_time_ping).total_seconds() * 1000)
 
     embed = discord.Embed(
         title='Statistiques du Bot',
@@ -160,8 +160,8 @@ async def ping(interaction: discord.Interaction):
         color=couleur
     )
     await interaction.response.send_message(embed=embed)
-    
-    
+
+
 @bot.tree.command(name="sync", description="[🤖 Dev ] Recharge les extensions et synchronise les commandes slash.")
 async def sync(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)  # Répondre immédiatement pour éviter le timeout
@@ -209,7 +209,7 @@ async def sync(interaction: discord.Interaction):
             traceback.print_exc(file=sys.stderr)
     else:
         await interaction.followup.send(f"<:error2:1347966692915023952>・Vous devez faire partie du personnel de Lyxios pour pouvoir utiliser cette commande.", ephemeral=True)
-    
+
 #---------------------------------------------------------------------------------------------------------------
 #---------------------------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------------------------
@@ -233,25 +233,25 @@ def run_flask_server():
 
 @bot.event
 async def on_ready():
-    if not change_status.is_running():
-        change_status.start()
-    target_bot = bot.get_user(BOT_ID)
+    """
+    Fonction on_ready principale du bot.
+    Elle est appelée une fois que le bot est connecté à Discord.
+    """
+    # Cet on_ready est exécuté APRÈS que tous les cogs aient été chargés
+    # et que le bot soit réellement prêt.
     print('Bot prêt')
     print("Bot running with:")
     print("Username: ", bot.user.name)
     print("User ID: ", bot.user.id)
     print("-------------------------")
-    print("Target Bot: ", target_bot.name)
-    
-    # Charger les cogs depuis la liste EXTENSIONS
-    for extension in EXTENSIONS:
-        try:
-            await bot.load_extension(extension)
-            print(f"✅ Extension '{extension}' chargée avec succès.")
-        except commands.ExtensionError as e:
-            print(f"❌ Erreur lors du chargement de l'extension '{extension}': {e}")
-        except Exception as e:
-            print(f"❌ Une erreur inattendue s'est produite lors du chargement de '{extension}': {e}")
+    target_bot = bot.get_user(BOT_ID)
+    if target_bot:
+        print("Target Bot: ", target_bot.name)
+    else:
+        print("Target Bot: Introuvable (ID: {})".format(BOT_ID))
+
+    if not change_status.is_running():
+        change_status.start()
 
     # Démarrer le serveur Flask dans un thread séparé
     server_thread = Thread(target=run_flask_server)
@@ -259,4 +259,36 @@ async def on_ready():
     server_thread.start()
     print(f"Serveur Flask démarré sur http://145.239.69.111:20170")
 
-bot.run(token)
+
+# --- Chargement des Cogs au démarrage ---
+# Cette partie est exécutée avant que bot.run() ne bloque le thread
+# et avant que l'événement on_ready ne soit déclenché par Discord.
+async def main():
+    # Charger les cogs
+    for extension in EXTENSIONS:
+        try:
+            await bot.load_extension(extension)
+            print(f"✅ Extension '{extension}' chargée avec succès.")
+        except commands.ExtensionError as e:
+            print(f"❌ Erreur lors du chargement de l'extension '{extension}': {e}")
+            traceback.print_exc()
+        except Exception as e:
+            print(f"❌ Une erreur inattendue s'est produite lors du chargement de '{extension}': {e}")
+            traceback.print_exc()
+
+    # Lancer le bot
+    await bot.start(token) # Utilisation de bot.start() pour un contrôle plus fin avec asyncio
+
+if __name__ == "__main__":
+    if token == "VOTRE_TOKEN_DISCORD_ICI" or not token:
+        print("❌ Erreur: Le token Discord n'est pas configuré. Veuillez le remplacer dans .env ou définir la variable d'environnement 'token'.")
+    else:
+        # Exécuter la fonction asynchrone main
+        try:
+            asyncio.run(main())
+        except KeyboardInterrupt:
+            None
+        except Exception as e:
+            print(f"❌ Erreur lors du démarrage du bot : {e}")
+            traceback.print_exc()
+
