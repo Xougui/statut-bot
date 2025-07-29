@@ -50,17 +50,20 @@ Suivez ces étapes pour préparer le bot sur votre ordinateur :
 
 La configuration se fait dans 3 fichiers principaux. Soyez très attentif !
 
-### 1. Le fichier `.env` (Très important pour votre token !)
+### 1. Le fichier `.env` (Très important pour votre token et les api !)
 
 Ce fichier est spécial car il contient le "token" secret de votre bot. Il ne doit jamais être partagé.
 
 1.  À la racine de votre dossier de bot (là où se trouve `main.py`), créez un nouveau fichier.
 2.  Nommez-le exactement `.env` (le point au début est important !).
 3.  Ouvrez ce fichier avec un éditeur de texte simple (comme le Bloc-notes sur Windows, TextEdit sur Mac, ou VS Code).
-4.  Ajoutez la ligne suivante à l'intérieur, en remplaçant `VOTRE_TOKEN_DE_BOT_ICI` par le vrai token que vous avez copié depuis le Portail des Développeurs Discord :
+4.  Ajoutez la ligne suivante à l'intérieur, en remplaçant `VOTRE_TOKEN_DE_BOT_ICI` par le vrai token que vous avez copié depuis le Portail des Développeurs Discord et `VOTRE_API_KEY_ICI` par la clé API Pterodactyl:
 
     ```
     token=VOTRE_TOKEN_DE_BOT_ICI
+    api_1=VOTRE_API_KEY_ICI
+    api_2=VOTRE_API_KEY_ICI
+    api_3=VOTRE_API_KEY_ICI
     ```
 
 ### 2. Le fichier `PARAM.py`
