@@ -8,17 +8,21 @@ import sys
 import PARAM # Importe les variables de configuration depuis le fichier PARAM.py
 import json # Importation pour la gestion des fichiers JSON
 import traceback # Importation pour le débogage des traces d'erreurs
+from dotenv import load_dotenv # Pour charger les variables d'environnement depuis un fichier .env
 
 # --- Configuration du Bot et de Pterodactyl ---
+load_dotenv() # Charge les variables du fichier .env
+apikey1 = os.getenv('api_xouxou')
+apikey2 = os.getenv('api_katabump')
 
 PTERODACTYL_CONFIGS = {
     "xouxou_hosting": {
         "url": "https://panel.xouxou-hosting.fr",
-        "api_key": "ptlc_sSTHXtyQCDUUx9OWqpYeWvNWpJUkJkHIsIr3k2fRdC1"
+        "api_key": apikey1
     },
     "katabump_hosting": {
         "url": "https://control.katabump.com",
-        "api_key": "ptlc_soOnu6eXvYLvro3qu1Ith3IVMgjSCPsjqnU090iI8CR"
+        "api_key": apikey2
     }
 }
 
