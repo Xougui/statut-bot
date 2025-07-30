@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands, tasks
-from pydactyl import PterodactylClient
+from pydactyl.api_client import PterodactylClient
 import datetime
 import os
 import asyncio
