@@ -2,7 +2,6 @@ discord.py==2.5.2
 Flask==3.1.1
 psutil==7.0.0
 py_dactyl==2.0.4
-pydactyl==0.5
 python-dotenv==1.1.1
 pytz==2025.2
 Requests==2.32.4
