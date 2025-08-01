@@ -19,6 +19,8 @@ load_dotenv()
 UPDATE_CHANNEL_ID = 1388563226005864573 # ID corrigé
 # Emoji à utiliser pour les éléments de la checklist
 CHECKLIST_EMOJI = PARAM.checkmark
+CROSSMARK_EMOJI = PARAM.crossmarck
+IN_PROGRESS_EMOJI = PARAM.in_progress
 
 # Importation des paramètres (assurez-vous que PARAM.py existe et est sécurisé)
 import PARAM
@@ -224,7 +226,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
                     translated_outro = translated_outro.replace("Conclusion: ", "").replace("Conclusion originale: ", "").strip()
 
                     translated_changes = translated_changes.replace('\\n', '\n') # Remplacer les doubles backslashes par un vrai saut de ligne
-                    translated_changes = translated_changes.replace('&', CHECKLIST_EMOJI)
+                    translated_changes = translated_changes.replace('&', CHECKLIST_EMOJI).replace('~', CROSSMARK_EMOJI).replace('{', f"{IN_PROGRESS_EMOJI}") # Appliquer les emojis de checklist et de croix
 
                     logging.info("Traduction anglaise réussie.")
                     break # Traduction réussie, sortir de la boucle de réessai
@@ -269,7 +271,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
         )
 
         # Appliquer l'emoji de checklist au texte français CORRIGÉ
-        final_changes_fr_display = corrected_changes_fr.replace('&', f"{CHECKLIST_EMOJI}:")
+        final_changes_fr_display = corrected_changes_fr.replace('&', f"{CHECKLIST_EMOJI}:").replace('~', f"{CROSSMARK_EMOJI}:").replace('{', f"{IN_PROGRESS_EMOJI}:")
 
         # Construction du message français
         french_message_parts = [
