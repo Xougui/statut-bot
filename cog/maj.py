@@ -21,6 +21,8 @@ UPDATE_CHANNEL_ID = 1388563226005864573 # ID corrigé
 CHECKLIST_EMOJI = PARAM.checkmark
 CROSSMARK_EMOJI = PARAM.crossmarck
 IN_PROGRESS_EMOJI = PARAM.in_progress
+ANNONCE_EMOJI = PARAM.annonce
+TEST_EMOJI = PARAM.test
 
 # Importation des paramètres (assurez-vous que PARAM.py existe et est sécurisé)
 import PARAM
@@ -275,14 +277,14 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
 
         # Construction du message français
         french_message_parts = [
-            f"✨ **{corrected_title_fr}** ✨\n\n", # Titre de la maj
+            f"# {ANNONCE_EMOJI} {corrected_title_fr} {ANNONCE_EMOJI}\n\n", # Titre de la maj
             f"👋 Coucou à toute la communauté !\n\n" # Coucou à la commu
         ]
         if corrected_intro_fr:
             french_message_parts.append(f"{corrected_intro_fr}\n\n") # Mot d'intro
         
         french_message_parts.append(
-            f"⚙️ <@1335228717403996160> a reçu une mise à jour importante !\n\n" # Mention utilisateur et maj
+            f"{TEST_EMOJI} <@1335228717403996160> a reçu une mise à jour importante !\n\n" # Mention utilisateur et maj
             f"Voici les changements et améliorations que nous avons apportés :\n"
             f"{final_changes_fr_display}\n\n" # Changements
         )
@@ -299,7 +301,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
         english_message_content = ""
         if translated_title and translated_changes:
             english_message_parts = [
-                f"✨ **{translated_title}** ✨\n\n", # Update Title
+                f"# {ANNONCE_EMOJI} {translated_title} {ANNONCE_EMOJI}\n\n", # Update Title
                 f"👋 Hello to the entire community!\n\n" # Hello to the community
             ]
             if translated_intro:
@@ -308,7 +310,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
             # Translate the specific user update message
             translated_user_update = "received an important update!"
             english_message_parts.append(
-                f"⚙️ <@1335228717403996160> {translated_user_update}\n\n" # User mention and update
+                f"{TEST_EMOJI} <@1335228717403996160> {translated_user_update}\n\n" # User mention and update
                 f"Here are the changes and improvements we've made:\n"
                 f"{translated_changes}\n\n" # Changes
             )
@@ -322,7 +324,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
             english_message_content = "".join(english_message_parts)
         else:
             # Message de fallback si la traduction échoue
-            english_message_content = f"📣 **{corrected_title_fr}** 📣\n\n" \
+            english_message_content = f"{ANNONCE_EMOJI} **{corrected_title_fr}** {ANNONCE_EMOJI}\n\n" \
                                       f"Hello everyone!\n\n" \
                                       f"Here's what changed:\n(Translation failed. Original French content provided below)\n{final_changes_fr_display}\n\n" \
                                       f"Stay tuned for future updates!"
@@ -353,7 +355,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
 
         try:
             # Combinaison des messages français et anglais
-            combined_message_content = f"{french_message_content}\n\n---\n\n{english_message_content}"
+            combined_message_content = f"{french_message_content}\n\n---\n\n{english_message_content}\n\n---\n\n-#[Support server](<{PARAM.support_server}>) "
 
             msg = await target_channel.send(content=combined_message_content, files=files_to_send)
 

@@ -23,9 +23,13 @@ ROLE_ID = 1350429004032770068
 
 # --------------------------------------------------
 # EMOJIS DISCORD
-checkmark = "<:checkmark:1400834922968649769>"
+checkmark = "<:checkmark:1400837715066359981>"
 crossmarck = "<:crossmark:1400837703481950218>"
 online = "<:up:1400895319473913976>"
 offline = "<:down:1400895329129205910>"
 in_progress = "<:in_progress:1400845862258868435>"
 maintenance = "<:maintenance:1400895308346429490>"
+annonce = "<:annonce:1400906704643817584>"
+test = "<:test:1400884178748178523>"
+
+support_server = "https://discord.gg/RZHrtzwUC2"
