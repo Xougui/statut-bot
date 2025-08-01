@@ -35,6 +35,9 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
         self.attachments = attachments
         self.update_channel_id = UPDATE_CHANNEL_ID
         self.gemini_api_key = gemini_api_key # Stocker la clé API pour utilisation dans les méthodes
+        # URL de l'API Gemini, stockée une fois pour être réutilisée
+        self.api_url_gemini = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key={self.gemini_api_key}"
+
 
     # Champ de texte pour le nom de la mise à jour
     update_name = ui.TextInput(
@@ -48,34 +51,99 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
     changes = ui.TextInput(
         label='Qu\'est-ce qui a changé ?',
         style=discord.TextStyle.paragraph,
-        placeholder='Décrivez les changements, les nouvelles fonctionnalités, les corrections de bugs...',
+        # Placeholder raccourci pour respecter la limite de 100 caractères de Discord
+        placeholder='Décrivez les changements, nouvelles fonctionnalités, corrections de bugs (sauts de ligne supportés).',
         max_length=2000,
         required=True
     )
 
-    async def _translate_text(self, title_fr: str, changes_fr: str) -> tuple[str, str]:
+    async def _translate_text(self, title_fr_original: str, changes_fr_original: str) -> tuple[str, str, str, str]:
         """
-        Traduit le titre et les changements du français à l'anglais en utilisant l'API Gemini.
-        Demande une réponse JSON structurée pour une meilleure robustesse.
+        Corrige l'orthographe française puis traduit le titre et les changements
+        du français à l'anglais en utilisant l'API Gemini.
+        Demande des réponses JSON structurées pour une meilleure robustesse.
 
         Args:
-            title_fr (str): Le titre de la mise à jour en français.
-            changes_fr (str): Les changements de la mise à jour en français.
+            title_fr_original (str): Le titre de la mise à jour en français (original).
+            changes_fr_original (str): Les changements de la mise à jour en français (original).
 
         Returns:
-            tuple[str, str]: Un tuple contenant le titre traduit et les changements traduits.
-                             Retourne les chaînes vides si la traduction échoue.
+            tuple[str, str, str, str]: Un tuple contenant:
+                                     - Le titre corrigé en français
+                                     - Les changements corrigés en français
+                                     - Le titre traduit en anglais
+                                     - Les changements traduits en anglais
+                                     Retourne des chaînes vides pour les traductions/corrections si une étape échoue.
         """
-        prompt = f"Traduisez le texte suivant du français à l'anglais. Ne répondez qu'avec la traduction au format JSON. Corrigez les fautes d'orthographe. Le JSON doit avoir deux clés: 'title' et 'changes'.\n\n" \
-                 f"Titre: {title_fr}\n" \
-                 f"Changements: {changes_fr}"
+        # --- Étape 1: Correction orthographique et grammaticale en français ---
+        corrected_title_fr = title_fr_original
+        corrected_changes_fr = changes_fr_original
 
-        chatHistory = []
-        chatHistory.append({ "role": "user", "parts": [{ "text": prompt }] })
+        prompt_correction = f"Corrigez les fautes d'orthographe et de grammaire dans le texte français suivant. Répondez uniquement avec un objet JSON. L'objet JSON doit avoir deux clés: 'corrected_title' et 'corrected_changes'. Les valeurs de ces clés doivent être le texte corrigé, sans préfixes. Assurez-vous de préserver tous les sauts de ligne originaux (`\\n`) dans le texte corrigé des changements mais seulement si il y a un saut de ligne dans le texte fourni.\n\n" \
+                            f"Titre: {title_fr_original}\n" \
+                            f"Changements: {changes_fr_original}"
 
-        # Définition du schéma de réponse attendu pour Gemini
-        payload = {
-            "contents": chatHistory,
+        chatHistory_correction = [{ "role": "user", "parts": [{ "text": prompt_correction }] }]
+        payload_correction = {
+            "contents": chatHistory_correction,
+            "generationConfig": {
+                "responseMimeType": "application/json",
+                "responseSchema": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "corrected_title": { "type": "STRING" },
+                        "corrected_changes": { "type": "STRING" }
+                    },
+                    "propertyOrdering": ["corrected_title", "corrected_changes"]
+                }
+            }
+        }
+
+        retries_correction = 0
+        max_retries_correction = 3 # Nombre de tentatives pour la correction française
+        while retries_correction < max_retries_correction:
+            try:
+                response_correction = await asyncio.to_thread(
+                    lambda: requests.post(self.api_url_gemini, headers={'Content-Type': 'application/json'}, data=json.dumps(payload_correction))
+                )
+                response_correction.raise_for_status()
+                result_correction = response_correction.json()
+
+                if result_correction.get("candidates") and result_correction["candidates"][0].get("content") and result_correction["candidates"][0]["content"].get("parts"):
+                    json_str_correction = result_correction["candidates"][0]["content"]["parts"][0]["text"]
+                    corrected_data = json.loads(json_str_correction)
+                    corrected_title_fr = corrected_data.get("corrected_title", title_fr_original) # Fallback au texte original si correction échoue
+                    corrected_changes_fr = corrected_data.get("corrected_changes", changes_fr_original) # Fallback au texte original
+                    corrected_changes_fr = corrected_changes_fr.replace('\\n', '\n') # Assurer la préservation des sauts de ligne
+                    logging.info("Correction française réussie.")
+                    break # Correction réussie, sortir de la boucle de réessai
+                else:
+                    logging.warning("Erreur: La structure de la réponse de l'API Gemini pour la correction est inattendue. Utilisation du texte original.")
+                    break # Pas de réponse valide, ne pas réessayer
+            except requests.exceptions.RequestException as e:
+                logging.error(f"Erreur lors de l'appel à l'API Gemini pour la correction (tentative {retries_correction + 1}/{max_retries_correction}): {e}")
+                retries_correction += 1
+                await asyncio.sleep(2 ** retries_correction) # Backoff exponentiel
+            except json.JSONDecodeError as e:
+                logging.error(f"Erreur de décodage JSON de la réponse Gemini pour la correction: {e}. Utilisation du texte original.")
+                break # Erreur de décodage JSON, pas de raison de réessayer
+            except Exception as e:
+                logging.error(f"Une erreur inattendue est survenue lors de la correction française: {e}. Utilisation du texte original.", exc_info=True)
+                break # Autre erreur inattendue, pas de raison de réessayer
+        else: # Ce bloc 'else' s'exécute si la boucle se termine sans 'break' (toutes les tentatives ont échoué)
+            logging.error(f"Échec de la correction française après {max_retries_correction} tentatives. Utilisation du texte original.")
+
+        # --- Étape 2: Traduction du français corrigé vers l'anglais ---
+        translated_title = ""
+        translated_changes = ""
+
+        prompt_translation = f"Traduisez le texte suivant du français à l'anglais. Répondez uniquement avec un objet JSON. L'objet JSON doit avoir deux clés: 'title' et 'changes'. Les valeurs de ces clés doivent être la traduction pure, sans préfixes comme 'Titre:' ou 'Changes:'. Assurez-vous de préserver tous les sauts de ligne originaux (`\\n`) dans la traduction des changements mais seulement si il y a un saut de ligne dans le texte fourni. Corrigez les fautes d'orthographe.\n\n" \
+                             f"Titre original: {corrected_title_fr}\n" \
+                             f"Changements originaux: {corrected_changes_fr}"
+
+        chatHistory_translation = [{ "role": "user", "parts": [{ "text": prompt_translation }] }]
+        payload_translation = {
+            "contents": chatHistory_translation,
             "generationConfig": {
                 "responseMimeType": "application/json",
                 "responseSchema": {
@@ -88,64 +156,75 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
                 }
             }
         }
-        apiUrl = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key={self.gemini_api_key}"
 
-        retries = 0
-        max_retries = 5
-        while retries < max_retries:
+        retries_translation = 0
+        max_retries_translation = 5 # Nombre de tentatives pour la traduction
+        while retries_translation < max_retries_translation:
             try:
-                response = await asyncio.to_thread(
-                    lambda: requests.post(apiUrl, headers={'Content-Type': 'application/json'}, data=json.dumps(payload))
+                response_translation = await asyncio.to_thread(
+                    lambda: requests.post(self.api_url_gemini, headers={'Content-Type': 'application/json'}, data=json.dumps(payload_translation))
                 )
-                response.raise_for_status() # Lève une exception pour les codes d'état HTTP d'erreur
+                response_translation.raise_for_status()
+                result_translation = response_translation.json()
 
-                result = response.json()
-                if result.get("candidates") and result["candidates"][0].get("content") and result["candidates"][0]["content"].get("parts"):
-                    # Le texte retourné par Gemini est déjà un JSON stringifié
-                    json_str = result["candidates"][0]["content"]["parts"][0]["text"]
-                    translated_data = json.loads(json_str)
+                if result_translation.get("candidates") and result_translation["candidates"][0].get("content") and result_translation["candidates"][0]["content"].get("parts"):
+                    json_str_translation = result_translation["candidates"][0]["content"]["parts"][0]["text"]
+                    translated_data = json.loads(json_str_translation)
 
                     translated_title = translated_data.get("title", "")
-                    translated_changes = translated_data.get("changes", "").replace('&', CHECKLIST_EMOJI)
-                    return translated_title, translated_changes
-                else:
-                    logging.warning("Erreur: La structure de la réponse de l'API Gemini est inattendue.")
-                    return "", "" # Retourne des chaînes vides en cas d'échec de parsing
-            except requests.exceptions.RequestException as e:
-                logging.error(f"Erreur lors de l'appel à l'API Gemini (tentative {retries + 1}/{max_retries}): {e}")
-                retries += 1
-                await asyncio.sleep(2 ** retries) # Backoff exponentiel
-            except json.JSONDecodeError as e:
-                logging.error(f"Erreur de décodage JSON de la réponse Gemini: {e}")
-                return "", "" # Retourne des chaînes vides en cas d'erreur JSON
-            except Exception as e:
-                logging.error(f"Une erreur inattendue est survenue lors de la traduction: {e}")
-                return "", "" # Retourne des chaînes vides pour toute autre erreur
+                    translated_changes = translated_data.get("changes", "")
 
-        logging.error(f"Échec de la traduction après {max_retries} tentatives.")
-        return "", "" # Retourne des chaînes vides si toutes les tentatives échouent
+                    # Nettoyage supplémentaire pour s'assurer qu'il n'y a pas de préfixes indésirables
+                    translated_title = translated_title.replace("Title: ", "").replace("Titre: ", "").strip()
+                    translated_changes = translated_changes.replace("Changes: ", "").replace("Changements: ", "").strip()
+                    translated_changes = translated_changes.replace('\\n', '\n') # Remplacer les doubles backslashes par un vrai saut de ligne
+                    translated_changes = translated_changes.replace('&', CHECKLIST_EMOJI)
+
+                    logging.info("Traduction anglaise réussie.")
+                    break # Traduction réussie, sortir de la boucle de réessai
+                else:
+                    logging.warning("Erreur: La structure de la réponse de l'API Gemini pour la traduction est inattendue.")
+                    break # Pas de réponse valide, ne pas réessayer
+            except requests.exceptions.RequestException as e:
+                logging.error(f"Erreur lors de l'appel à l'API Gemini pour la traduction (tentative {retries_translation + 1}/{max_retries_translation}): {e}")
+                retries_translation += 1
+                await asyncio.sleep(2 ** retries_translation)
+            except json.JSONDecodeError as e:
+                logging.error(f"Erreur de décodage JSON de la réponse Gemini pour la traduction: {e}")
+                break
+            except Exception as e:
+                logging.error(f"Une erreur inattendue est survenue lors de la traduction: {e}", exc_info=True)
+                break
+        else:
+            logging.error(f"Échec de la traduction après {max_retries_translation} tentatives.")
+
+        # Retourne le titre et les changements corrigés en français, et les traductions en anglais
+        return corrected_title_fr, corrected_changes_fr, translated_title, translated_changes
 
     async def on_submit(self, interaction: discord.Interaction):
         """
-        Gère la soumission du modal. Récupère les données, tente la traduction,
+        Gère la soumission du modal. Récupère les données, tente la correction et la traduction,
         et envoie le message de mise à jour au canal Discord.
         """
-        # Déferrer la réponse pour avoir plus de temps, mais l'éphémère est géré par le modal lui-même.
-        # Le modal est déjà "répondu" par l'affichage, donc nous utilisons followup pour les messages suivants.
         await interaction.response.defer(thinking=True, ephemeral=True)
 
-        update_title_fr = self.update_name.value
-        changes_fr = self.changes.value.replace('&', CHECKLIST_EMOJI)
+        # Les valeurs originales du modal
+        original_title_fr = self.update_name.value
+        original_changes_fr = self.changes.value
 
-        # Tente de traduire le titre et les changements
-        translated_title, translated_changes = await self._translate_text(
-            self.update_name.value, self.changes.value
+        # Tente de corriger le français puis de traduire
+        corrected_title_fr, corrected_changes_fr, translated_title, translated_changes = await self._translate_text(
+            original_title_fr, original_changes_fr
         )
 
+        # Appliquer l'emoji de checklist au texte français CORRIGÉ
+        final_changes_fr_display = corrected_changes_fr.replace('&', CHECKLIST_EMOJI)
+
+        # Utiliser le titre et les changements CORRIGÉS pour le message français
         french_message_content = f"📣 **GROSSE ANNONCE !** 📣\n\n" \
                                  f"Salut tout le monde !\n\n" \
-                                 f"Nous avons une nouvelle mise à jour : **{update_title_fr}**\n\n" \
-                                 f"Voici ce qui a changé :\n{changes_fr}\n\n" \
+                                 f"Nous avons une nouvelle mise à jour : **{corrected_title_fr}**\n\n" \
+                                 f"Voici ce qui a changé :\n{final_changes_fr_display}\n\n" \
                                  f"Restez connectés pour les prochaines nouveautés !"
 
         english_message_content = ""
@@ -159,12 +238,12 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
             # Message de fallback si la traduction échoue
             english_message_content = f"📣 **BIG ANNOUNCEMENT!** 📣\n\n" \
                                       f"Hello everyone!\n\n" \
-                                      f"We have a new update: **{update_title_fr}**\n\n" \
-                                      f"Here's what changed:\n(Translation failed. Original French content provided below)\n{self.changes.value.replace('&', CHECKLIST_EMOJI)}\n\n" \
+                                      f"We have a new update: **{corrected_title_fr}**\n\n" \
+                                      f"Here's what changed:\n(Translation failed. Original French content provided below)\n{final_changes_fr_display}\n\n" \
                                       f"Stay tuned for future updates!"
             await interaction.followup.send(
                 "Avertissement : La traduction automatique de la mise à jour a échoué. "
-                "Le message sera envoyé avec le contenu original en français pour les changements en anglais.",
+                "Le message sera envoyé avec le contenu français corrigé pour les changements en anglais (si la correction a réussi).",
                 ephemeral=True
             )
 
@@ -205,7 +284,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
                 "Veuillez vérifier mes permissions.", ephemeral=True
             )
         except Exception as e:
-            logging.error(f"Une erreur est survenue lors de l'envoi du message : {e}")
+            logging.error(f"Une erreur est survenue lors de l'envoi du message : {e}", exc_info=True)
             await interaction.followup.send(f"Une erreur est survenue lors de l'envoi du message : {e}", ephemeral=True)
 
 
@@ -268,7 +347,7 @@ class ManagementCog(commands.Cog):
         else:
             logging.error(f"Erreur inattendue dans /update: {error}", exc_info=True) # exc_info=True pour le traceback
             await interaction.followup.send(
-                f"Une erreur inattendue est survenue lors de l'exécution de la commande : {error}",
+                f"Une erreur est survenue lors de l'exécution de la commande : {error}",
                 ephemeral=True
             )
 
@@ -278,4 +357,3 @@ async def setup(bot: commands.Bot):
     Fonction de configuration pour ajouter le Cog au bot.
     """
     await bot.add_cog(ManagementCog(bot))
-    logging.info("ManagementCog chargé.") # Utilisation de logging ici aussi
