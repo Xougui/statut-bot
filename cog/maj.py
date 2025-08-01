@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 load_dotenv()
 
 # ID du canal où les mises à jour seront envoyées
-UPDATE_CHANNEL_ID = 1388563226005864573
+UPDATE_CHANNEL_ID = 1388563326005864573 # J'ai ajusté l'ID ici pour l'exemple, assurez-vous que c'est le bon.
 # Emoji à utiliser pour les éléments de la checklist
 CHECKLIST_EMOJI = "✅"
 
@@ -47,6 +47,15 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
         required=True
     )
 
+    # Champ de texte pour un petit mot d'introduction facultatif
+    intro_message = ui.TextInput(
+        label='Message d\'introduction (facultatif)',
+        placeholder='Ajoutez un petit mot au début de l\'annonce (ex: "Chers utilisateurs,").',
+        max_length=500,
+        required=False, # Rendu facultatif
+        row=1 # Positionnement
+    )
+
     # Champ de texte pour la description des changements
     changes = ui.TextInput(
         label='Qu\'est-ce qui a changé ?',
@@ -54,34 +63,55 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
         # Placeholder raccourci pour respecter la limite de 100 caractères de Discord
         placeholder='Décrivez les changements, nouvelles fonctionnalités, corrections de bugs (sauts de ligne supportés).',
         max_length=2000,
-        required=True
+        required=True,
+        row=2 # Positionnement
     )
 
-    async def _translate_text(self, title_fr_original: str, changes_fr_original: str) -> tuple[str, str, str, str]:
+    # Champ de texte pour un petit mot de conclusion facultatif
+    outro_message = ui.TextInput(
+        label='Message de conclusion (facultatif)',
+        placeholder='Ajoutez un petit mot à la fin de l\'annonce (ex: "Merci de votre soutien !").',
+        max_length=500,
+        required=False, # Rendu facultatif
+        row=3 # Positionnement
+    )
+
+    async def _translate_text(self, title_fr_original: str, changes_fr_original: str,
+                               intro_fr_original: str, outro_fr_original: str) -> tuple[str, str, str, str, str, str, str, str]:
         """
-        Corrige l'orthographe française puis traduit le titre et les changements
-        du français à l'anglais en utilisant l'API Gemini.
+        Corrige l'orthographe française puis traduit le titre, les changements,
+        le message d'introduction et de conclusion du français à l'anglais en utilisant l'API Gemini.
         Demande des réponses JSON structurées pour une meilleure robustesse.
 
         Args:
             title_fr_original (str): Le titre de la mise à jour en français (original).
             changes_fr_original (str): Les changements de la mise à jour en français (original).
+            intro_fr_original (str): Le message d'introduction en français (original).
+            outro_fr_original (str): Le message de conclusion en français (original).
 
         Returns:
-            tuple[str, str, str, str]: Un tuple contenant:
+            tuple[str, str, str, str, str, str, str, str]: Un tuple contenant:
                                      - Le titre corrigé en français
                                      - Les changements corrigés en français
+                                     - Le message d'introduction corrigé en français
+                                     - Le message de conclusion corrigé en français
                                      - Le titre traduit en anglais
                                      - Les changements traduits en anglais
+                                     - Le message d'introduction traduit en anglais
+                                     - Le message de conclusion traduit en anglais
                                      Retourne des chaînes vides pour les traductions/corrections si une étape échoue.
         """
         # --- Étape 1: Correction orthographique et grammaticale en français ---
         corrected_title_fr = title_fr_original
         corrected_changes_fr = changes_fr_original
+        corrected_intro_fr = intro_fr_original
+        corrected_outro_fr = outro_fr_original
 
-        prompt_correction = f"Corrigez les fautes d'orthographe et de grammaire dans le texte français suivant. Répondez uniquement avec un objet JSON. L'objet JSON doit avoir deux clés: 'corrected_title' et 'corrected_changes'. Les valeurs de ces clés doivent être le texte corrigé, sans préfixes. Assurez-vous de préserver tous les sauts de ligne originaux (`\\n`) dans le texte corrigé des changements mais seulement si il y a un saut de ligne dans le texte fourni.\n\n" \
+        prompt_correction = f"Corrigez les fautes d'orthographe et de grammaire dans le texte français suivant. Répondez uniquement avec un objet JSON. L'objet JSON doit avoir quatre clés: 'corrected_title', 'corrected_changes', 'corrected_intro', et 'corrected_outro'. Les valeurs de ces clés doivent être le texte corrigé, sans préfixes. Assurez-vous de préserver tous les sauts de ligne originaux (`\\n`) dans le texte corrigé des changements.\n\n" \
                             f"Titre: {title_fr_original}\n" \
-                            f"Changements: {changes_fr_original}"
+                            f"Changements: {changes_fr_original}\n" \
+                            f"Introduction: {intro_fr_original}\n" \
+                            f"Conclusion: {outro_fr_original}"
 
         chatHistory_correction = [{ "role": "user", "parts": [{ "text": prompt_correction }] }]
         payload_correction = {
@@ -92,9 +122,11 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
                     "type": "OBJECT",
                     "properties": {
                         "corrected_title": { "type": "STRING" },
-                        "corrected_changes": { "type": "STRING" }
+                        "corrected_changes": { "type": "STRING" },
+                        "corrected_intro": { "type": "STRING" },
+                        "corrected_outro": { "type": "STRING" }
                     },
-                    "propertyOrdering": ["corrected_title", "corrected_changes"]
+                    "propertyOrdering": ["corrected_title", "corrected_changes", "corrected_intro", "corrected_outro"]
                 }
             }
         }
@@ -114,6 +146,8 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
                     corrected_data = json.loads(json_str_correction)
                     corrected_title_fr = corrected_data.get("corrected_title", title_fr_original) # Fallback au texte original si correction échoue
                     corrected_changes_fr = corrected_data.get("corrected_changes", changes_fr_original) # Fallback au texte original
+                    corrected_intro_fr = corrected_data.get("corrected_intro", intro_fr_original)
+                    corrected_outro_fr = corrected_data.get("corrected_outro", outro_fr_original)
                     corrected_changes_fr = corrected_changes_fr.replace('\\n', '\n') # Assurer la préservation des sauts de ligne
                     logging.info("Correction française réussie.")
                     break # Correction réussie, sortir de la boucle de réessai
@@ -136,10 +170,14 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
         # --- Étape 2: Traduction du français corrigé vers l'anglais ---
         translated_title = ""
         translated_changes = ""
+        translated_intro = ""
+        translated_outro = ""
 
-        prompt_translation = f"Traduisez le texte suivant du français à l'anglais. Répondez uniquement avec un objet JSON. L'objet JSON doit avoir deux clés: 'title' et 'changes'. Les valeurs de ces clés doivent être la traduction pure, sans préfixes comme 'Titre:' ou 'Changes:'. Assurez-vous de préserver tous les sauts de ligne originaux (`\\n`) dans la traduction des changements mais seulement si il y a un saut de ligne dans le texte fourni. Corrigez les fautes d'orthographe.\n\n" \
+        prompt_translation = f"Traduisez le texte suivant du français à l'anglais. Répondez uniquement avec un objet JSON. L'objet JSON doit avoir quatre clés: 'title', 'changes', 'intro', et 'outro'. Les valeurs de ces clés doivent être la traduction pure, sans préfixes comme 'Titre:' ou 'Changes:'. Assurez-vous de préserver tous les sauts de ligne originaux (`\\n`) dans la traduction des changements. Corrigez les fautes d'orthographe.\n\n" \
                              f"Titre original: {corrected_title_fr}\n" \
-                             f"Changements originaux: {corrected_changes_fr}"
+                             f"Changements originaux: {corrected_changes_fr}\n" \
+                             f"Introduction originale: {corrected_intro_fr}\n" \
+                             f"Conclusion originale: {corrected_outro_fr}"
 
         chatHistory_translation = [{ "role": "user", "parts": [{ "text": prompt_translation }] }]
         payload_translation = {
@@ -150,9 +188,11 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
                     "type": "OBJECT",
                     "properties": {
                         "title": { "type": "STRING" },
-                        "changes": { "type": "STRING" }
+                        "changes": { "type": "STRING" },
+                        "intro": { "type": "STRING" },
+                        "outro": { "type": "STRING" }
                     },
-                    "propertyOrdering": ["title", "changes"]
+                    "propertyOrdering": ["title", "changes", "intro", "outro"]
                 }
             }
         }
@@ -173,10 +213,15 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
 
                     translated_title = translated_data.get("title", "")
                     translated_changes = translated_data.get("changes", "")
+                    translated_intro = translated_data.get("intro", "")
+                    translated_outro = translated_data.get("outro", "")
 
                     # Nettoyage supplémentaire pour s'assurer qu'il n'y a pas de préfixes indésirables
                     translated_title = translated_title.replace("Title: ", "").replace("Titre: ", "").strip()
                     translated_changes = translated_changes.replace("Changes: ", "").replace("Changements: ", "").strip()
+                    translated_intro = translated_intro.replace("Introduction: ", "").replace("Introduction originale: ", "").strip()
+                    translated_outro = translated_outro.replace("Conclusion: ", "").replace("Conclusion originale: ", "").strip()
+
                     translated_changes = translated_changes.replace('\\n', '\n') # Remplacer les doubles backslashes par un vrai saut de ligne
                     translated_changes = translated_changes.replace('&', CHECKLIST_EMOJI)
 
@@ -199,7 +244,8 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
             logging.error(f"Échec de la traduction après {max_retries_translation} tentatives.")
 
         # Retourne le titre et les changements corrigés en français, et les traductions en anglais
-        return corrected_title_fr, corrected_changes_fr, translated_title, translated_changes
+        return (corrected_title_fr, corrected_changes_fr, corrected_intro_fr, corrected_outro_fr,
+                translated_title, translated_changes, translated_intro, translated_outro)
 
     async def on_submit(self, interaction: discord.Interaction):
         """
@@ -211,27 +257,66 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
         # Les valeurs originales du modal
         original_title_fr = self.update_name.value
         original_changes_fr = self.changes.value
+        original_intro_fr = self.intro_message.value if self.intro_message.value else ""
+        original_outro_fr = self.outro_message.value if self.outro_message.value else ""
+
 
         # Tente de corriger le français puis de traduire
-        corrected_title_fr, corrected_changes_fr, translated_title, translated_changes = await self._translate_text(
-            original_title_fr, original_changes_fr
+        (corrected_title_fr, corrected_changes_fr, corrected_intro_fr, corrected_outro_fr,
+         translated_title, translated_changes, translated_intro, translated_outro) = await self._translate_text(
+            original_title_fr, original_changes_fr, original_intro_fr, original_outro_fr
         )
 
         # Appliquer l'emoji de checklist au texte français CORRIGÉ
         final_changes_fr_display = corrected_changes_fr.replace('&', f"{CHECKLIST_EMOJI}:")
 
-        # Utiliser le titre et les changements CORRIGÉS pour le message français
-        french_message_content = f"📣 **{corrected_title_fr}** 📣\n\n" \
-                                 f"Salut tout le monde !\n\n" \
-                                 f"Voici ce qui a changé :\n{final_changes_fr_display}\n\n" \
-                                 f"Restez connectés pour les prochaines nouveautés !"
+        # Construction du message français
+        french_message_parts = [
+            f"✨ **{corrected_title_fr}** ✨\n\n", # Titre de la maj
+            f"👋 Coucou à toute la communauté !\n\n" # Coucou à la commu
+        ]
+        if corrected_intro_fr:
+            french_message_parts.append(f"{corrected_intro_fr}\n\n") # Mot d'intro
+        
+        french_message_parts.append(
+            f"⚙️ <@1335228717403996160> a reçu une mise à jour importante !\n\n" # Mention utilisateur et maj
+            f"Voici les changements et améliorations que nous avons apportés :\n"
+            f"{final_changes_fr_display}\n\n" # Changements
+        )
+        if corrected_outro_fr:
+            french_message_parts.append(f"{corrected_outro_fr}\n\n") # Mot conclusion
+        
+        french_message_parts.append(
+            f"🚀 Restez connectés pour de futures annonces et merci pour votre soutien continu !\n"
+            f"L'équipe de développement." # Conclusion
+        )
+        french_message_content = "".join(french_message_parts)
 
+        # Construction du message anglais
         english_message_content = ""
         if translated_title and translated_changes:
-            english_message_content = f"📣 **{translated_title}** 📣\n\n" \
-                                      f"Hello everyone!\n\n" \
-                                      f"Here's what changed:\n{translated_changes}\n\n" \
-                                      f"Stay tuned for future updates!"
+            english_message_parts = [
+                f"✨ **{translated_title}** ✨\n\n", # Update Title
+                f"👋 Hello to the entire community!\n\n" # Hello to the community
+            ]
+            if translated_intro:
+                english_message_parts.append(f"{translated_intro}\n\n") # Intro message
+            
+            # Translate the specific user update message
+            translated_user_update = "received an important update!"
+            english_message_parts.append(
+                f"⚙️ <@1335228717403996160> {translated_user_update}\n\n" # User mention and update
+                f"Here are the changes and improvements we've made:\n"
+                f"{translated_changes}\n\n" # Changes
+            )
+            if translated_outro:
+                english_message_parts.append(f"{translated_outro}\n\n") # Outro message
+            
+            english_message_parts.append(
+                f"🚀 Stay tuned for future announcements and thank you for your continued support!\n"
+                f"The Development Team." # Conclusion
+            )
+            english_message_content = "".join(english_message_parts)
         else:
             # Message de fallback si la traduction échoue
             english_message_content = f"📣 **{corrected_title_fr}** 📣\n\n" \
@@ -271,13 +356,24 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
 
             # Si le canal est un canal d'annonces, le message est publié
             if isinstance(target_channel, discord.TextChannel) and target_channel.is_news():
-                await msg.publish()
+                try:
+                    await msg.publish()
+                    logging.info(f"Message publié dans le canal d'annonces {target_channel.name} ({target_channel.id}).")
+                except discord.Forbidden:
+                    logging.error(f"Permissions insuffisantes pour publier le message dans le canal d'annonces {target_channel.name} ({target_channel.id}).")
+                    await interaction.followup.send(
+                        "Je n'ai pas la permission de publier le message dans ce canal d'annonces. "
+                        "Veuillez vérifier mes permissions (Gérer les messages).", ephemeral=True
+                    )
+                except Exception as e:
+                    logging.error(f"Une erreur inattendue est survenue lors de la publication du message : {e}", exc_info=True)
+                    await interaction.followup.send(f"Une erreur est survenue lors de la publication du message : {e}", ephemeral=True)
 
             await interaction.followup.send("L'annonce de mise à jour a été envoyée avec succès !", ephemeral=True)
         except discord.Forbidden:
             logging.error(f"Permissions insuffisantes pour envoyer/publier dans le canal {self.update_channel_id}.")
             await interaction.followup.send(
-                "Je n'ai pas la permission d'envoyer des messages ou de les publier dans ce canal. "
+                "Je n'ai pas la permission d'envoyer des messages dans ce canal. "
                 "Veuillez vérifier mes permissions.", ephemeral=True
             )
         except Exception as e:
@@ -326,27 +422,45 @@ class ManagementCog(commands.Cog):
         """
         Gestionnaire d'erreurs pour la commande /update.
         """
-        if not interaction.response.is_done():
+        if interaction.response.is_done():
+            # Si l'interaction a déjà été répondue (ex: modal envoyé, mais erreur dans on_submit)
+            # Utiliser followup.send
             try:
-                await interaction.response.defer(ephemeral=True)
+                if isinstance(error, app_commands.CheckFailure):
+                    # L'erreur est déjà gérée par is_owner()
+                    pass
+                elif isinstance(error, app_commands.CommandOnCooldown):
+                    await interaction.followup.send(
+                        f"Cette commande est en cooldown. Veuillez réessayer dans {error.retry_after:.1f} secondes.",
+                        ephemeral=True
+                    )
+                else:
+                    logging.error(f"Erreur inattendue dans /update (followup): {error}", exc_info=True)
+                    await interaction.followup.send(
+                        f"Une erreur est survenue lors de l'exécution de la commande : {error}",
+                        ephemeral=True
+                    )
             except discord.errors.NotFound:
-                logging.error(f"Erreur: Interaction déjà perdue lors de la gestion d'erreur: {error}")
-                return
-
-        if isinstance(error, app_commands.CheckFailure):
-            # L'erreur est déjà gérée par is_owner() qui envoie un message éphémère
-            pass
-        elif isinstance(error, app_commands.CommandOnCooldown):
-            await interaction.followup.send(
-                f"Cette commande est en cooldown. Veuillez réessayer dans {error.retry_after:.1f} secondes.",
-                ephemeral=True
-            )
+                logging.error(f"Erreur: Interaction déjà perdue lors de la gestion d'erreur (tentative de followup): {error}")
         else:
-            logging.error(f"Erreur inattendue dans /update: {error}", exc_info=True) # exc_info=True pour le traceback
-            await interaction.followup.send(
-                f"Une erreur est survenue lors de l'exécution de la commande : {error}",
-                ephemeral=True
-            )
+            # Si l'interaction n'a PAS encore été répondue (ex: erreur avant l'envoi du modal, ou send_modal a échoué)
+            # Utiliser la réponse initiale
+            try:
+                if isinstance(error, app_commands.CheckFailure):
+                    await interaction.response.send_message("Vous n'êtes pas autorisé à utiliser cette commande.", ephemeral=True)
+                elif isinstance(error, app_commands.CommandOnCooldown):
+                    await interaction.response.send_message(
+                        f"Cette commande est en cooldown. Veuillez réessayer dans {error.retry_after:.1f} secondes.",
+                        ephemeral=True
+                    )
+                else:
+                    logging.error(f"Erreur inattendue dans /update (réponse initiale): {error}", exc_info=True)
+                    await interaction.response.send_message(
+                        f"Une erreur est survenue lors de l'exécution de la commande : {error}",
+                        ephemeral=True
+                    )
+            except discord.errors.NotFound:
+                logging.error(f"Erreur: Interaction déjà perdue lors de la gestion d'erreur (tentative de réponse initiale): {error}")
 
 
 async def setup(bot: commands.Bot):
