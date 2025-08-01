@@ -66,6 +66,9 @@ class Statut(commands.Cog):
         Tente de changer le nom du canal avec une gestion des rate limits,
         uniquement si le nom actuel est différent du nouveau nom.
         """
+        # Ajout de logs pour le débogage du changement de nom
+        log.info(f"Tentative de changement de nom du canal '{channel.name}' en '{new_name}'.")
+
         if channel.name == new_name:
             # Le nom du canal est déjà correct, pas besoin de le changer
             log.debug(f"Nom du canal déjà '{new_name}'. Aucune modification nécessaire.")
@@ -81,8 +84,11 @@ class Statut(commands.Cog):
                     retry_after = e.retry_after if e.retry_after else 5 # Utilise retry_after ou une valeur par défaut
                     log.warning(f"Rate limited lors du changement de nom du canal. Réessai dans {retry_after:.2f} secondes.")
                     await asyncio.sleep(retry_after)
+                elif e.status == 403: # Erreur 403: Forbidden (permissions manquantes)
+                    log.error(f"Erreur 403 (Permissions insuffisantes) lors du changement de nom du canal '{channel.name}' en '{new_name}'. Vérifiez la permission 'Gérer les salons'.")
+                    return False
                 else:
-                    log.error(f"Erreur HTTP lors du changement de nom du canal: {e}")
+                    log.error(f"Erreur HTTP ({e.status}) lors du changement de nom du canal: {e}")
                     return False # Échec pour une autre raison
             except Exception as e:
                 log.error(f"Erreur inattendue lors du changement de nom du canal: {e}")
@@ -192,6 +198,7 @@ class Statut(commands.Cog):
                 
                 # Le nom du canal doit être mis à jour même à la création si ce n'est pas déjà le cas
                 channel_new_name = "═🟢・online" if is_target_bot_online else "═🔴・offline"
+                # Attendre que le changement de nom soit terminé
                 await self._change_channel_name_with_retry(channel, channel_new_name)
 
                 return # Sortir après la création et l'initialisation pour éviter les actions redondantes
@@ -271,6 +278,7 @@ class Statut(commands.Cog):
 
             # Gère le changement de nom du canal
             channel_new_name = "═🟢・online" if is_target_bot_online else "═🔴・offline"
+            # Attendre que le changement de nom soit terminé
             await self._change_channel_name_with_retry(channel, channel_new_name)
 
             # Mention
@@ -302,6 +310,7 @@ class Statut(commands.Cog):
         channel = self.bot.get_channel(self.CHANNEL_ID)
         if not channel:
             await interaction.followup.send(f"Erreur: Canal avec l'ID {self.CHANNEL_ID} introuvable. Veuillez vérifier PARAM.py.", ephemeral=True)
+            log.error(f"Erreur: Canal avec l'ID {self.CHANNEL_ID} introuvable dans set_statut_slash.")
             return
 
         message = None
@@ -309,12 +318,15 @@ class Statut(commands.Cog):
             message = await channel.fetch_message(self.MESSAGE_ID)
         except discord.NotFound:
             await interaction.followup.send(f"Erreur: Message avec l'ID {self.MESSAGE_ID} introuvable dans le canal {self.CHANNEL_ID}. Veuillez vérifier l'ID ou créer le message.", ephemeral=True)
+            log.error(f"Erreur: Message avec l'ID {self.MESSAGE_ID} introuvable dans le canal {self.CHANNEL_ID} dans set_statut_slash.")
             return
         except discord.Forbidden:
             await interaction.followup.send(f"Erreur: Permissions insuffisantes pour récupérer le message dans le canal {self.CHANNEL_ID}.", ephemeral=True)
+            log.error(f"Erreur: Permissions insuffisantes pour récupérer le message dans le canal {self.CHANNEL_ID} dans set_statut_slash.")
             return
         except Exception as e:
             await interaction.followup.send(f"Erreur inattendue lors de la récupération du message: {e}", ephemeral=True)
+            log.error(f"Erreur inattendue lors de la récupération du message dans set_statut_slash: {e}")
             return
 
         logs_channel = self.bot.get_channel(self.LOGS_CHANNEL_ID)
@@ -330,6 +342,7 @@ class Statut(commands.Cog):
                 self.check_bot_status.start() # Redémarre la tâche si elle était arrêtée
             
             # Force une vérification immédiate pour mettre à jour l'embed
+            # et le nom du canal via la tâche automatique
             await self.check_bot_status()
             
             await interaction.followup.send("Le statut du bot est maintenant en mode **automatique**.", ephemeral=True)
@@ -355,11 +368,12 @@ class Statut(commands.Cog):
         needs_update = False
         if temp_last_known_status != self._last_known_status:
             needs_update = True
+            log.debug(f"Changement de statut manuel détecté: de {self._last_known_status} à {temp_last_known_status}.")
         
         current_embed_title = message.embeds[0].title if message.embeds else None
         if current_embed_title != new_embed.title:
             needs_update = True
-            log.info(f"Le statut manuel est le même, mais le titre de l'embed est incorrect. Mise à jour forcée de l'embed.")
+            log.info(f"Le statut manuel est le même, mais le titre de l'embed est incorrect (actuel: '{current_embed_title}', attendu: '{new_embed.title}'). Mise à jour forcée de l'embed.")
 
         if needs_update:
             # Effectue la mise à jour de l'embed
@@ -375,7 +389,8 @@ class Statut(commands.Cog):
                 log.error(f"Erreur inattendue lors de la mise à jour manuelle de l'embed: {e}")
 
             # Envoie le log
-            if logs_channel and (temp_last_known_status != self._last_known_status or (message.embeds and message.embeds[0].title != new_embed.title)):
+            # Le log est envoyé si le statut a changé OU si l'embed a été mis à jour (même si le statut était déjà le même)
+            if logs_channel:
                 log_embed = self._create_status_embed(target_status_type, maj)
                 log_embed.title = f"{ONLINE_EMOJI if target_status_type == 'online' else (OFFLINE_EMOJI if target_status_type == 'offline' else MAINTENANCE_EMOJI)}・Bot {target_status_type}"
                 log_embed.description = f"Le bot est **{target_status_type}** (manuel)"
@@ -396,9 +411,11 @@ class Statut(commands.Cog):
             elif target_status_type == "maintenance":
                 channel_new_name = "═🔵・maintenance" # Nouveau nom pour la maintenance
             
+            # Attendre que le changement de nom soit terminé
             await self._change_channel_name_with_retry(channel, channel_new_name)
 
             # Mention quand le bot change de statut (manuellement)
+            # Le ping est envoyé si le statut a réellement changé ou si l'embed a été mis à jour
             if temp_last_known_status != self._last_known_status or (message.embeds and message.embeds[0].title != new_embed.title):
                 await self._send_and_delete_ping(channel, self.PING_ROLE_ID, target_status_type)
 
@@ -406,8 +423,10 @@ class Statut(commands.Cog):
             self._last_known_status = temp_last_known_status
             await interaction.followup.send(f"Statut du bot mis à jour à `{status.value}`.", ephemeral=True)
         else:
+            # Si aucune mise à jour n'est nécessaire, on envoie quand même un followup pour terminer l'interaction
             await interaction.followup.send(f"Le statut du bot est déjà `{status.value}` et l'embed est à jour. Aucune mise à jour nécessaire.", ephemeral=True)
 
 
 async def setup(bot):
     await bot.add_cog(Statut(bot))
+
