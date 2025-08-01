@@ -17,6 +17,9 @@ MESSAGE_ID = PARAM.MESSAGE_ID
 LOGS_CHANNEL_ID = PARAM.LOGS_CHANNEL_ID
 PING_ROLE_ID = PARAM.ROLE_ID
 
+offline = PARAM.offline
+online = PARAM.online
+
 tz = pytz.timezone('Europe/Paris') # Définition du fuseau horaire
 
 class Statut(commands.Cog):
@@ -88,13 +91,13 @@ class Statut(commands.Cog):
         """
         if is_online:
             return discord.Embed(
-                title="<a:online:1346871066198413362>・**Bot en ligne**",
+                title=f"{online}・**Bot en ligne**",
                 description=f"Le bot **Lyxios** est **en ligne** et toutes ses commandes et modules sont opérationnels !\n> Check ça pour savoir si le bot est `offline` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi .",
                 color=0x00ff00
             ).set_footer(text=f"Mis à jour le: {maj}")
         else:
             return discord.Embed(
-                title="<a:offline:1346871717938729062>・**Bot hors ligne**",
+                title=f"{offline}・**Bot hors ligne**",
                 description=f"Le bot **Lyxios** est **hors ligne**.\n\n> Ne vous inquiétez pas, le bot reviendra en ligne !\n> Check ça pour savoir si le bot est `online` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi\n-# Merci de votre patience.",
                 color=0xff0000
             ).set_footer(text=f"Mis à jour le: {maj}")
@@ -207,7 +210,7 @@ class Statut(commands.Cog):
             # Envoie le log
             if logs_channel:
                 log_embed = self._create_status_embed(is_target_bot_online, maj)
-                log_embed.title = f"<a:{'online' if is_target_bot_online else 'offline'}:{'1346871066198413362' if is_target_bot_online else '1346871717938729062'}>・Bot {'en ligne' if is_target_bot_online else 'hors ligne'}"
+                log_embed.title = f"{[online] if is_target_bot_online else [offline]}・Bot {'en ligne' if is_target_bot_online else 'hors ligne'}"
                 log_embed.description = f"Le bot est **{'en ligne' if is_target_bot_online else 'hors ligne'}**"
                 try:
                     await logs_channel.send(embed=log_embed)
@@ -312,7 +315,7 @@ class Statut(commands.Cog):
             # Envoie le log si le statut a changé ou l'embed a été mis à jour
             if logs_channel and (target_status_is_online != self._last_known_status or (message.embeds and message.embeds[0].title != new_embed.title)):
                 log_embed = self._create_status_embed(target_status_is_online, maj)
-                log_embed.title = f"<a:{'online' if target_status_is_online else 'offline'}:{'1346871066198413362' if target_status_is_online else '1346871717938729062'}>・Bot {'en ligne' if target_status_is_online else 'hors ligne'}"
+                log_embed.title = f"{[online] if target_status_is_online else [offline]}・Bot {'en ligne' if target_status_is_online else 'hors ligne'}"
                 log_embed.description = f"Le bot est **{'en ligne' if target_status_is_online else 'hors ligne'}** (manuel)"
                 try:
                     await logs_channel.send(embed=log_embed)

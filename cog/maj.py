@@ -5,6 +5,7 @@ import json
 import asyncio
 import requests
 import io
+import PARAM
 from dotenv import load_dotenv
 import os
 import logging
@@ -17,7 +18,7 @@ load_dotenv()
 # ID du canal où les mises à jour seront envoyées
 UPDATE_CHANNEL_ID = 1388563226005864573 # ID corrigé
 # Emoji à utiliser pour les éléments de la checklist
-CHECKLIST_EMOJI = "✅"
+CHECKLIST_EMOJI = PARAM.checkmark
 
 # Importation des paramètres (assurez-vous que PARAM.py existe et est sécurisé)
 import PARAM

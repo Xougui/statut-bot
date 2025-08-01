@@ -20,3 +20,10 @@ LOGS_CHANNEL_ID = 1350443541867790406
 # L'ID du rôle à mentionner dans les messages de statut envoyés dans CHANNEL_ID.
 ROLE_ID = 1350429004032770068
 # pipreqs --force --encoding=utf8 .
+
+# --------------------------------------------------
+# EMOJIS DISCORD
+checkmark = "<:checkmark:1400834922968649769>"
+crossmarck = "<:crossmark:1400837703481950218>"
+online = "<a:online:1346871066198413362>"
+offline = "<a:offline:1400837872126263329>"
