@@ -218,27 +218,24 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
         )
 
         # Appliquer l'emoji de checklist au texte français CORRIGÉ
-        final_changes_fr_display = corrected_changes_fr.replace('&', CHECKLIST_EMOJI)
+        final_changes_fr_display = corrected_changes_fr.replace('&', f"{CHECKLIST_EMOJI}:")
 
         # Utiliser le titre et les changements CORRIGÉS pour le message français
-        french_message_content = f"📣 **GROSSE ANNONCE !** 📣\n\n" \
+        french_message_content = f"📣 **{corrected_title_fr}** 📣\n\n" \
                                  f"Salut tout le monde !\n\n" \
-                                 f"Nous avons une nouvelle mise à jour : **{corrected_title_fr}**\n\n" \
                                  f"Voici ce qui a changé :\n{final_changes_fr_display}\n\n" \
                                  f"Restez connectés pour les prochaines nouveautés !"
 
         english_message_content = ""
         if translated_title and translated_changes:
-            english_message_content = f"📣 **BIG ANNOUNCEMENT!** 📣\n\n" \
+            english_message_content = f"📣 **{translated_title}** 📣\n\n" \
                                       f"Hello everyone!\n\n" \
-                                      f"We have a new update: **{translated_title}**\n\n" \
                                       f"Here's what changed:\n{translated_changes}\n\n" \
                                       f"Stay tuned for future updates!"
         else:
             # Message de fallback si la traduction échoue
-            english_message_content = f"📣 **BIG ANNOUNCEMENT!** 📣\n\n" \
+            english_message_content = f"📣 **{corrected_title_fr}** 📣\n\n" \
                                       f"Hello everyone!\n\n" \
-                                      f"We have a new update: **{corrected_title_fr}**\n\n" \
                                       f"Here's what changed:\n(Translation failed. Original French content provided below)\n{final_changes_fr_display}\n\n" \
                                       f"Stay tuned for future updates!"
             await interaction.followup.send(
