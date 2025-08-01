@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 load_dotenv()
 
 # ID du canal où les mises à jour seront envoyées
-UPDATE_CHANNEL_ID = 1388563326005864573 # J'ai ajusté l'ID ici pour l'exemple, assurez-vous que c'est le bon.
+UPDATE_CHANNEL_ID = 1388563226005864573 # ID corrigé
 # Emoji à utiliser pour les éléments de la checklist
 CHECKLIST_EMOJI = "✅"
 
