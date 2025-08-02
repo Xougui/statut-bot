@@ -181,7 +181,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
         translated_intro = ""
         translated_outro = ""
 
-        prompt_translation = f"Traduisez le texte suivant du français à l'anglais. Répondez uniquement avec un objet JSON. L'objet JSON doit avoir quatre clés: 'title', 'changes', 'intro', et 'outro'. Les valeurs de ces clés doivent être la traduction pure, sans préfixes comme 'Titre:' ou 'Changes:'. Assurez-vous de préserver tous les sauts de ligne originaux (`\\n`) dans la traduction des changements. Corrigez les fautes d'orthographe.\n\n" \
+        prompt_translation = f"Traduisez le texte suivant du français à l'anglais. Répondez uniquement avec un objet JSON. L'objet JSON doit avoir quatre clés: 'title', 'changes', 'intro', et 'outro'. Les valeurs de ces clés doivent être la traduction pure, sans préfixes comme 'Titre:' ou 'Changes:'. Assurez-vous de préserver tous les sauts de ligne originaux (`\\n`) dans la traduction des changements. Corrigez les fautes d'orthographe. Assurez vous de ne pas traduire les mots entourés de ` comme par exemple: `/ping` ou encore les emojis discord sous cette forme: <:blurry_eyes:1399680951704879156> ou <a:blurry_eyes:1399680951704879156>.\n\n" \
                              f"Titre original: {corrected_title_fr}\n" \
                              f"Changements originaux: {corrected_changes_fr}\n" \
                              f"Introduction originale: {corrected_intro_fr}\n" \
@@ -354,13 +354,53 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
 
         try:
             # Combinaison des messages français et anglais
-            combined_message_content = f"<@&1350428823052746752>\n\n{french_message_content}\n\n---\n\n{english_message_content}\n\n---\n\n-# Support Server: <{PARAM.support_server}> "
+            full_message_content = f"<@&1350428823052746752>\n\n{french_message_content}\n\n---\n\n{english_message_content}\n\n---\n\n-# Support Server: <{PARAM.support_server}> "
 
-            msg = await target_channel.send(content=combined_message_content, files=files_to_send)
+            # Diviser le message si sa longueur dépasse 2000 caractères
+            if len(full_message_content) > 2000:
+                # Trouver un point de coupure intelligent, par exemple après la section française
+                # ou au milieu de la section anglaise si la section française est déjà longue.
+                # Pour simplifier, nous allons couper après la section française et envoyer le reste.
+                
+                # Le début du message, incluant le ping du rôle et le message français
+                first_part = f"<@&1350428823052746752>\n\n{french_message_content}"
+
+                # Le reste du message, incluant la séparation et le message anglais
+                second_part = f"---\n\n{english_message_content}\n\n---\n\n-# Support Server: <{PARAM.support_server}> "
+
+                # Si la première partie est trop longue, il faudra la diviser davantage.
+                # Pour l'instant, supposons que la première partie est gérable seule.
+                # Si la première partie dépasse 2000 caractères, nous devrons la découper.
+                # Pour cet exemple, nous allons simplement envoyer la première partie, puis la seconde.
+                # Une logique plus robuste pourrait chercher le dernier saut de ligne ou paragraphe.
+
+                if len(first_part) > 2000:
+                    # Si même la première partie est trop longue, il faut la diviser.
+                    # On va chercher le dernier saut de ligne avant 2000 caractères pour couper proprement.
+                    split_index = first_part.rfind('\n', 0, 1990) # Un peu de marge
+                    if split_index == -1: # Pas de saut de ligne, couper brutalement
+                        split_index = 1990
+                    
+                    part1_a = first_part[:split_index]
+                    part1_b = first_part[split_index:]
+
+                    await target_channel.send(content=part1_a)
+                    # Envoyer les fichiers avec la dernière partie du message
+                    msg = await target_channel.send(content=part1_b, files=files_to_send)
+                    await target_channel.send(content=second_part) # Envoyer la partie anglaise séparément
+                else:
+                    # La première partie est bonne, envoyer la et la deuxième partie
+                    await target_channel.send(content=first_part)
+                    msg = await target_channel.send(content=second_part, files=files_to_send)
+            else:
+                # Le message entier tient en un seul message
+                msg = await target_channel.send(content=full_message_content, files=files_to_send)
 
             # Si le canal est un canal d'annonces, le message est publié
             if isinstance(target_channel, discord.TextChannel) and target_channel.is_news():
                 try:
+                    # Si le message a été envoyé en plusieurs parties, seul le dernier message peut être publié.
+                    # Ou si c'est un seul message, c'est celui-là.
                     await msg.publish()
                     logging.info(f"Message publié dans le canal d'annonces {target_channel.name} ({target_channel.id}).")
                 except discord.Forbidden:
