@@ -400,7 +400,17 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
                     await followup_message.edit(content="📢 Publication de l'annonce...")
                     try:
                         # Publier le premier message envoyé
-                        await sent_messages[0].publish()
+                        for i in range(len(sent_messages)):
+                            if i == 0:
+                                await sent_messages[i].publish()
+                            else:
+                                while True:
+                                    try:
+                                        await sent_messages[i].publish()
+                                        break # Si la publication réussit, sortir de la boucle
+                                    except discord.HTTPException as e:
+                                        logging.error(f"Échec de la publication du message {i+1} dans le canal d'annonces: {e}")
+                                        await asyncio.sleep(2)
                         logging.info(f"Premier message publié dans le canal d'annonces {target_channel.name} ({target_channel.id}).")
                     except discord.Forbidden:
                         logging.error(f"Permissions insuffisantes pour publier le message dans le canal d'annonces {target_channel.name} ({target_channel.id}).")
