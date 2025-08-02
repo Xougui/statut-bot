@@ -15,8 +15,11 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 load_dotenv()
 
-# ID du canal où les mises à jour seront envoyées
-UPDATE_CHANNEL_ID = 1345064533173080166 # ID corrigé
+# ID du canal où les mises à jour seront envoyées (canal par défaut pour les vraies annonces)
+UPDATE_CHANNEL_ID_PROD = 1345064533173080166 
+# ID du canal pour les fausses annonces (tests)
+UPDATE_CHANNEL_ID_TEST = 1350138595515568169
+
 # Emoji à utiliser pour les éléments de la checklist
 CHECKLIST_EMOJI = PARAM.checkmark
 CROSSMARK_EMOJI = PARAM.crossmarck
@@ -35,10 +38,10 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
     Modal Discord pour collecter les informations d'une nouvelle mise à jour.
     Permet à l'utilisateur de saisir le nom de la mise à jour et les changements.
     """
-    def __init__(self, attachments: list[discord.Attachment]):
+    def __init__(self, attachments: list[discord.Attachment], target_channel_id: int):
         super().__init__()
         self.attachments = attachments
-        self.update_channel_id = UPDATE_CHANNEL_ID
+        self.update_channel_id = target_channel_id # Utilise l'ID du canal passé en argument
         self.gemini_api_key = gemini_api_key # Stocker la clé API pour utilisation dans les méthodes
         # URL de l'API Gemini, stockée une fois pour être réutilisée
         self.api_url_gemini = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key={self.gemini_api_key}"
@@ -330,9 +333,8 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
                 "Le message sera envoyé sans traduction.",
                 ephemeral=True
             )
-
-
-        target_channel = interaction.guild.get_channel(self.update_channel_id)
+ 
+        target_channel = interaction.guild.get_channel(self.update_channel_id) # Utilise l'ID du canal stocké dans l'instance du modal
         if not target_channel:
             logging.error(f"Le canal avec l'ID {self.update_channel_id} n'a pas été trouvé.")
             await interaction.followup.send(
@@ -406,16 +408,26 @@ class ManagementCog(commands.Cog):
     @app_commands.describe(
         attachments="Fichier à joindre à l'annonce (image, document, etc.)"
     )
+    @app_commands.choices(
+        test=[
+            app_commands.Choice(name="Oui", value="oui"),
+            app_commands.Choice(name="Non", value="non")
+        ]
+    )
     @is_owner() # Applique la vérification des propriétaires
-    async def update_command(self, interaction: discord.Interaction, attachments: discord.Attachment = None):
+    async def update_command(self, interaction: discord.Interaction, test: str,  attachments: discord.Attachment = None):
         """
         Commande slash /update pour déclencher le modal de mise à jour.
+        Définit le canal cible en fonction du paramètre 'test'.
         """
         files_for_modal = []
         if attachments:
             files_for_modal.append(attachments)
 
-        modal = UpdateModal(attachments=files_for_modal)
+        # Déterminer l'ID du canal cible en fonction du paramètre 'test'
+        target_channel_id = UPDATE_CHANNEL_ID_TEST if test == "oui" else UPDATE_CHANNEL_ID_PROD
+
+        modal = UpdateModal(attachments=files_for_modal, target_channel_id=target_channel_id)
         # Appelez send_modal directement sur interaction.response
         await interaction.response.send_modal(modal)
 
