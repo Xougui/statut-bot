@@ -4,7 +4,7 @@ owners = [946098490654740580, 1178647820052467823]
 
 # --- COULEUR DES EMBEDS ---
 # Couleur par défaut pour les messages intégrés (embeds). Utilisez un format hexadécimal.
-couleur = 0xd7a826
+couleur = 0x42694b
 
 # --- ID DU BOT À SURVEILLER ---
 # L'ID de l'utilisateur du bot dont vous voulez suivre le statut.
