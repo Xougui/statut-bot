@@ -66,7 +66,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
 
     # Champ de texte pour la description des changements
     changes = ui.TextInput(
-        label='Qu\'est-ce qui a changé ?',
+        label='Qu\'est-ce qui a changé ? &:✅ / ~:❌ / £:⏳',
         style=discord.TextStyle.paragraph,
         # Placeholder raccourci pour respecter la limite de 100 caractères de Discord
         placeholder='Décrivez les changements, nouvelles fonctionnalités, corrections de bugs (sauts de ligne supportés).',
@@ -231,7 +231,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
                     translated_outro = translated_outro.replace("Conclusion: ", "").replace("Conclusion originale: ", "").strip()
 
                     translated_changes = translated_changes.replace('\\n', '\n') # Remplacer les doubles backslashes par un vrai saut de ligne
-                    translated_changes = translated_changes.replace('&', CHECKLIST_EMOJI).replace('~', CROSSMARK_EMOJI).replace('{', f"{IN_PROGRESS_EMOJI}") # Appliquer les emojis de checklist et de croix
+                    translated_changes = translated_changes.replace('&', CHECKLIST_EMOJI).replace('~', CROSSMARK_EMOJI).replace('£', f"{IN_PROGRESS_EMOJI}") # Appliquer les emojis de checklist et de croix
 
                     logging.info("Traduction anglaise réussie.")
                     break # Traduction réussie, sortir de la boucle de réessai
@@ -276,7 +276,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
         )
 
         # Appliquer l'emoji de checklist au texte français CORRIGÉ
-        final_changes_fr_display = corrected_changes_fr.replace('&', f"{CHECKLIST_EMOJI}:").replace('~', f"{CROSSMARK_EMOJI}:").replace('{', f"{IN_PROGRESS_EMOJI}:")
+        final_changes_fr_display = corrected_changes_fr.replace('&', f"{CHECKLIST_EMOJI}:").replace('~', f"{CROSSMARK_EMOJI}:").replace('£', f"{IN_PROGRESS_EMOJI}:")
 
         # Construction du message français
         french_message_parts = [
@@ -354,7 +354,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
 
         try:
             # Combinaison des messages français et anglais
-            combined_message_content = f"<@&1350428823052746752>\n\n{french_message_content}\n\n---\n\n{english_message_content}\n\n---\n\n-# [Support server](<{PARAM.support_server}>) "
+            combined_message_content = f"<@&1350428823052746752>\n\n{french_message_content}\n\n---\n\n{english_message_content}\n\n---\n\n-# Support Server: <{PARAM.support_server}> "
 
             msg = await target_channel.send(content=combined_message_content, files=files_to_send)
 
@@ -406,7 +406,8 @@ class ManagementCog(commands.Cog):
 
     @app_commands.command(name="update", description="[🤖 Dev ] Envoie une annonce de mise à jour du bot.")
     @app_commands.describe(
-        attachments="Fichier à joindre à l'annonce (image, document, etc.)"
+        attachments="Fichier à joindre à l'annonce (image, document, etc.)",
+        test="Envoyer l'annonce sur le canal de test ?"
     )
     @app_commands.choices(
         test=[
