@@ -164,7 +164,7 @@ async def ping_command(interaction: discord.Interaction):
         color=couleur
     )
     # Modifie la réponse initiale avec l'embed final
-    await interaction.edit_original_response(embed=embed)
+    await interaction.edit_original_response("", embed=embed)
 
 
 # Nouvelle commande /infos-tech
