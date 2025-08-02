@@ -291,7 +291,7 @@ class Statut(commands.Cog):
             log.debug(f"Le statut du bot cible n'a pas changé et l'embed est à jour ({current_status_type}). Aucune mise à jour nécessaire.")
 
 
-    @app_commands.command(name="statut", description="Définit manuellement le statut du bot ou le remet en mode automatique.")
+    @app_commands.command(name="statut", description="[🤖 Dev] Définit manuellement le statut du bot ou le remet en mode automatique.")
     @app_commands.describe(status="Le statut à définir pour le bot.")
     @app_commands.choices(status=[
         app_commands.Choice(name="Online", value="online"),

@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 load_dotenv()
 
 # ID du canal où les mises à jour seront envoyées
-UPDATE_CHANNEL_ID = 1388563226005864573 # ID corrigé
+UPDATE_CHANNEL_ID = 1345064533173080166 # ID corrigé
 # Emoji à utiliser pour les éléments de la checklist
 CHECKLIST_EMOJI = PARAM.checkmark
 CROSSMARK_EMOJI = PARAM.crossmarck
@@ -284,7 +284,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
             french_message_parts.append(f"{corrected_intro_fr}\n\n") # Mot d'intro
         
         french_message_parts.append(
-            f"{TEST_EMOJI} <@1335228717403996160> a reçu une mise à jour importante !\n\n" # Mention utilisateur et maj
+            f"{TEST_EMOJI} <@1335228717403996160> a reçu une mise à jour !\n\n" # Mention utilisateur et maj
             f"Voici les changements et améliorations que nous avons apportés :\n"
             f"{final_changes_fr_display}\n\n" # Changements
         )
@@ -292,7 +292,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
             french_message_parts.append(f"{corrected_outro_fr}\n\n") # Mot conclusion
         
         french_message_parts.append(
-            f"🚀 Restez connectés pour de futures annonces et merci pour votre soutien continu !\n"
+            f"🚀 Restez connectés pour de futures annonces et merci pour votre soutien continu ! **Utilisez /feedback pour signaler des erreurs ou des bugs ou allez dans <#1350399062418915418>.**\n"
             f"L'équipe de développement." # Conclusion
         )
         french_message_content = "".join(french_message_parts)
@@ -308,7 +308,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
                 english_message_parts.append(f"{translated_intro}\n\n") # Intro message
             
             # Translate the specific user update message
-            translated_user_update = "received an important update!"
+            translated_user_update = "received an update !"
             english_message_parts.append(
                 f"{TEST_EMOJI} <@1335228717403996160> {translated_user_update}\n\n" # User mention and update
                 f"Here are the changes and improvements we've made:\n"
@@ -318,19 +318,16 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
                 english_message_parts.append(f"{translated_outro}\n\n") # Outro message
             
             english_message_parts.append(
-                f"🚀 Stay tuned for future announcements and thank you for your continued support!\n"
+                f"🚀 Stay tuned for future announcements and thank you for your continued support! **Use /feedback to report errors or bugs or go to <#1350399062418915418>.**\n"
                 f"The Development Team." # Conclusion
             )
             english_message_content = "".join(english_message_parts)
         else:
             # Message de fallback si la traduction échoue
-            english_message_content = f"{ANNONCE_EMOJI} **{corrected_title_fr}** {ANNONCE_EMOJI}\n\n" \
-                                      f"Hello everyone!\n\n" \
-                                      f"Here's what changed:\n(Translation failed. Original French content provided below)\n{final_changes_fr_display}\n\n" \
-                                      f"Stay tuned for future updates!"
+            english_message_content = f"### {CROSSMARK_EMOJI} Translation failed\n\n"
             await interaction.followup.send(
                 "Avertissement : La traduction automatique de la mise à jour a échoué. "
-                "Le message sera envoyé avec le contenu français corrigé pour les changements en anglais (si la correction a réussi).",
+                "Le message sera envoyé sans traduction.",
                 ephemeral=True
             )
 
@@ -355,7 +352,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
 
         try:
             # Combinaison des messages français et anglais
-            combined_message_content = f"{french_message_content}\n\n---\n\n{english_message_content}\n\n---\n\n-#[Support server](<{PARAM.support_server}>) "
+            combined_message_content = f"<@&1350428823052746752>\n\n{french_message_content}\n\n---\n\n{english_message_content}\n\n---\n\n-# [Support server](<{PARAM.support_server}>) "
 
             msg = await target_channel.send(content=combined_message_content, files=files_to_send)
 
