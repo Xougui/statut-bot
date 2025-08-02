@@ -260,7 +260,10 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
         Gère la soumission du modal. Récupère les données, tente la correction et la traduction,
         et envoie le message de mise à jour au canal Discord.
         """
-        await interaction.response.defer(thinking=True, ephemeral=True)
+        # Répondre immédiatement à l'interaction de manière éphémère pour afficher le statut
+        await interaction.response.send_message("🚀 Préparation de l'annonce de mise à jour...", ephemeral=True)
+        # Récupérer le message de réponse pour pouvoir le modifier par la suite
+        followup_message = await interaction.original_response()
 
         # Les valeurs originales du modal
         original_title_fr = self.update_name.value
@@ -268,7 +271,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
         original_intro_fr = self.intro_message.value if self.intro_message.value else ""
         original_outro_fr = self.outro_message.value if self.outro_message.value else ""
 
-
+        await followup_message.edit(content="✨ Correction et traduction du contenu...")
         # Tente de corriger le français puis de traduire
         (corrected_title_fr, corrected_changes_fr, corrected_intro_fr, corrected_outro_fr,
          translated_title, translated_changes, translated_intro, translated_outro) = await self._translate_text(
@@ -328,18 +331,17 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
         else:
             # Message de fallback si la traduction échoue
             english_message_content = f"### {CROSSMARK_EMOJI} Translation failed\n\n"
-            await interaction.followup.send(
-                "Avertissement : La traduction automatique de la mise à jour a échoué. "
-                "Le message sera envoyé sans traduction.",
-                ephemeral=True
+            await followup_message.edit(
+                content="⚠️ Avertissement : La traduction automatique de la mise à jour a échoué. "
+                "Le message sera envoyé sans traduction."
             )
  
         target_channel = interaction.guild.get_channel(self.update_channel_id) # Utilise l'ID du canal stocké dans l'instance du modal
         if not target_channel:
             logging.error(f"Le canal avec l'ID {self.update_channel_id} n'a pas été trouvé.")
-            await interaction.followup.send(
-                f"Erreur: Le canal avec l'ID `{self.update_channel_id}` n'a pas été trouvé. "
-                "Veuillez vérifier l'ID configuré.", ephemeral=True
+            await followup_message.edit(
+                content=f"❌ Erreur: Le canal avec l'ID `{self.update_channel_id}` n'a pas été trouvé. "
+                "Veuillez vérifier l'ID configuré."
             )
             return
 
@@ -350,79 +352,99 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
                 files_to_send.append(discord.File(fp=io.BytesIO(file_bytes), filename=attachment.filename))
             except Exception as e:
                 logging.error(f"Impossible de télécharger la pièce jointe {attachment.filename}: {e}")
-                await interaction.followup.send(f"Avertissement: Impossible d'attacher le fichier `{attachment.filename}`.", ephemeral=True)
+                await followup_message.edit(content=f"⚠️ Avertissement: Impossible d'attacher le fichier `{attachment.filename}`.")
 
         try:
+            await followup_message.edit(content="📤 Envoi de l'annonce sur Discord...")
             # Combinaison des messages français et anglais
-            full_message_content = f"<@&1350428823052746752>\n\n{french_message_content}\n\n---\n\n{english_message_content}\n\n---\n\n-# Support Server: <{PARAM.support_server}> "
+            full_message_content = f"{french_message_content}\n\n---\n\n{english_message_content}\n\n---\n\n-# Support Server: <{PARAM.support_server}> "
 
+            # Liste pour stocker les messages envoyés
+            sent_messages = []
+            
             # Diviser le message si sa longueur dépasse 2000 caractères
             if len(full_message_content) > 2000:
-                # Trouver un point de coupure intelligent, par exemple après la section française
-                # ou au milieu de la section anglaise si la section française est déjà longue.
-                # Pour simplifier, nous allons couper après la section française et envoyer le reste.
-                
-                # Le début du message, incluant le ping du rôle et le message français
-                first_part = f"<@&1350428823052746752>\n\n{french_message_content}"
+                # Découper le message en morceaux de 2000 caractères maximum
+                # On essaie de couper à des sauts de ligne pour éviter de couper un mot au milieu
+                current_index = 0
+                while current_index < len(full_message_content):
+                    remaining_content = full_message_content[current_index:]
+                    if len(remaining_content) <= 2000:
+                        part_to_send = remaining_content
+                        current_index = len(full_message_content) # Fin du message
+                    else:
+                        # Trouver le dernier saut de ligne avant 2000 caractères
+                        cut_point = remaining_content.rfind('\n', 0, 2000)
+                        if cut_point == -1: # Pas de saut de ligne, couper brutalement
+                            cut_point = 2000
+                        part_to_send = remaining_content[:cut_point]
+                        current_index += cut_point
 
-                # Le reste du message, incluant la séparation et le message anglais
-                second_part = f"---\n\n{english_message_content}\n\n---\n\n-# Support Server: <{PARAM.support_server}> "
+                    # Envoyer la partie du message
+                    # Les fichiers ne sont envoyés qu'avec la première partie pour éviter les duplicatas
+                    if not sent_messages: # Si c'est la première partie
+                        msg = await target_channel.send(content=part_to_send, files=files_to_send)
+                    else:
+                        msg = await target_channel.send(content=part_to_send)
+                    sent_messages.append(msg)
+                    await asyncio.sleep(1) # Petit délai pour éviter le ratelimit
 
-                # Si la première partie est trop longue, il faudra la diviser davantage.
-                # Pour l'instant, supposons que la première partie est gérable seule.
-                # Si la première partie dépasse 2000 caractères, nous devrons la découper.
-                # Pour cet exemple, nous allons simplement envoyer la première partie, puis la seconde.
-                # Une logique plus robuste pourrait chercher le dernier saut de ligne ou paragraphe.
-
-                if len(first_part) > 2000:
-                    # Si même la première partie est trop longue, il faut la diviser.
-                    # On va chercher le dernier saut de ligne avant 2000 caractères pour couper proprement.
-                    split_index = first_part.rfind('\n', 0, 1990) # Un peu de marge
-                    if split_index == -1: # Pas de saut de ligne, couper brutalement
-                        split_index = 1990
-                    
-                    part1_a = first_part[:split_index]
-                    part1_b = first_part[split_index:]
-
-                    await target_channel.send(content=part1_a)
-                    # Envoyer les fichiers avec la dernière partie du message
-                    msg = await target_channel.send(content=part1_b, files=files_to_send)
-                    await target_channel.send(content=second_part) # Envoyer la partie anglaise séparément
-                else:
-                    # La première partie est bonne, envoyer la et la deuxième partie
-                    await target_channel.send(content=first_part)
-                    msg = await target_channel.send(content=second_part, files=files_to_send)
             else:
                 # Le message entier tient en un seul message
                 msg = await target_channel.send(content=full_message_content, files=files_to_send)
-
-            # Si le canal est un canal d'annonces, le message est publié
+                sent_messages.append(msg)
+            
+            # Si le canal est un canal d'annonces, le PREMIER message est publié
             if isinstance(target_channel, discord.TextChannel) and target_channel.is_news():
+                if sent_messages:
+                    await followup_message.edit(content="📢 Publication de l'annonce...")
+                    try:
+                        # Publier le premier message envoyé
+                        await sent_messages[0].publish()
+                        logging.info(f"Premier message publié dans le canal d'annonces {target_channel.name} ({target_channel.id}).")
+                    except discord.Forbidden:
+                        logging.error(f"Permissions insuffisantes pour publier le message dans le canal d'annonces {target_channel.name} ({target_channel.id}).")
+                        await followup_message.edit(
+                            content="❌ Je n'ai pas la permission de publier le message dans ce canal d'annonces. "
+                            "Veuillez vérifier mes permissions (Gérer les messages)."
+                        )
+                    except Exception as e:
+                        logging.error(f"Une erreur inattendue est survenue lors de la publication du message : {e}", exc_info=True)
+                        await followup_message.edit(content=f"❌ Une erreur est survenue lors de la publication du message : {e}")
+            
+            # Ajouter la réaction au dernier message envoyé (la dernière partie de l'annonce)
+            if sent_messages:
+                await followup_message.edit(content="✅ Ajout de la réaction de vérification...")
                 try:
-                    # Si le message a été envoyé en plusieurs parties, seul le dernier message peut être publié.
-                    # Ou si c'est un seul message, c'est celui-là.
-                    await msg.publish()
-                    logging.info(f"Message publié dans le canal d'annonces {target_channel.name} ({target_channel.id}).")
-                except discord.Forbidden:
-                    logging.error(f"Permissions insuffisantes pour publier le message dans le canal d'annonces {target_channel.name} ({target_channel.id}).")
-                    await interaction.followup.send(
-                        "Je n'ai pas la permission de publier le message dans ce canal d'annonces. "
-                        "Veuillez vérifier mes permissions (Gérer les messages).", ephemeral=True
-                    )
+                    verify_emoji_id = 1350435235015426130 # ID de l'emoji 'verify'
+                    # Créer un objet PartialEmoji pour les emojis personnalisés (animés ou non)
+                    verify_emoji = discord.PartialEmoji(name="verify", animated=True, id=verify_emoji_id)
+                    await sent_messages[-1].add_reaction(verify_emoji)
+                    logging.info(f"Réaction ajoutée au dernier message de mise à jour.")
+                except discord.HTTPException as e:
+                    logging.error(f"Impossible d'ajouter la réaction au message: {e}")
+                    await followup_message.edit(content=f"⚠️ Avertissement: Impossible d'ajouter la réaction à l'annonce. Erreur: {e}")
                 except Exception as e:
-                    logging.error(f"Une erreur inattendue est survenue lors de la publication du message : {e}", exc_info=True)
-                    await interaction.followup.send(f"Une erreur est survenue lors de la publication du message : {e}", ephemeral=True)
+                    logging.error(f"Une erreur inattendue est survenue lors de l'ajout de la réaction : {e}", exc_info=True)
+                    await followup_message.edit(content=f"⚠️ Avertissement: Une erreur est survenue lors de l'ajout de la réaction : {e}")
 
-            await interaction.followup.send("L'annonce de mise à jour a été envoyée avec succès !", ephemeral=True)
+            # Envoyer le ghost ping à la fin
+            await followup_message.edit(content="👻 Envoi du signal de fin...")
+            await asyncio.sleep(5) # Attendre un peu pour s'assurer que tout est envoyé
+            mention = await target_channel.send("<@&1350428823052746752>")
+            await asyncio.sleep(1)
+            await mention.delete()
+
+            await followup_message.edit(content="🎉 L'annonce de mise à jour a été envoyée avec succès et publiée !")
         except discord.Forbidden:
             logging.error(f"Permissions insuffisantes pour envoyer/publier dans le canal {self.update_channel_id}.")
-            await interaction.followup.send(
-                "Je n'ai pas la permission d'envoyer des messages dans ce canal. "
-                "Veuillez vérifier mes permissions.", ephemeral=True
+            await followup_message.edit(
+                content="❌ Je n'ai pas la permission d'envoyer des messages dans ce canal. "
+                "Veuillez vérifier mes permissions."
             )
         except Exception as e:
             logging.error(f"Une erreur est survenue lors de l'envoi du message : {e}", exc_info=True)
-            await interaction.followup.send(f"Une erreur est survenue lors de l'envoi du message : {e}", ephemeral=True)
+            await followup_message.edit(content=f"❌ Une erreur est survenue lors de l'envoi du message : {e}")
 
 
 class ManagementCog(commands.Cog):
