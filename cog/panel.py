@@ -342,10 +342,7 @@ class BotControl(commands.Cog):
                 disk_usage = round(resources.get('disk_bytes', 0) / (1024 * 1024), 2)
 
             except Exception as e:
-                error_message = f"Erreur lors de la récupération des infos du serveur '{server_name}': `{type(e).__name__}: {e}`"
-                print(f"⚠️ {error_message}")
-                traceback.print_exc()
-                embed_color = discord.Color.red() # Erreur -> couleur rouge
+                None
 
         embed = discord.Embed(title="🔧 Système de Contrôle des Bots", color=embed_color)
         embed.add_field(name="🔹 Bot sélectionné :", value=server_name, inline=False)

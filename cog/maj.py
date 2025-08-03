@@ -115,7 +115,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
         corrected_intro_fr = intro_fr_original
         corrected_outro_fr = outro_fr_original
 
-        prompt_correction = f"Corrigez les fautes d'orthographe et de grammaire dans le texte français suivant. Répondez uniquement avec un objet JSON. L'objet JSON doit avoir quatre clés: 'corrected_title', 'corrected_changes', 'corrected_intro', et 'corrected_outro'. Les valeurs de ces clés doivent être le texte corrigé, sans préfixes. Assurez-vous de préserver tous les sauts de ligne originaux (`\\n`) dans le texte corrigé des changements.\n\n" \
+        prompt_correction = f"Corrigez les fautes d'orthographe et de grammaire dans le texte français suivant. Répondez uniquement avec un objet JSON. L'objet JSON doit avoir quatre clés: 'corrected_title', 'corrected_changes', 'corrected_intro', et 'corrected_outro'. Les valeurs de ces clés doivent être le texte corrigé, sans préfixes. Assurez-vous de préserver tous les sauts de ligne originaux (`\\n`) dans le texte corrigé des changements. N'enlève pas les caractères spéciaux comme &; ~; £.\n\n" \
                             f"Titre: {title_fr_original}\n" \
                             f"Changements: {changes_fr_original}\n" \
                             f"Introduction: {intro_fr_original}\n" \
@@ -291,7 +291,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
         
         french_message_parts.append(
             f"{TEST_EMOJI} <@1335228717403996160> a reçu une mise à jour !\n\n" # Mention utilisateur et maj
-            f"Voici les changements et améliorations que nous avons apportés :\n"
+            f"Voici les changements et améliorations que nous avons apportés :\n\n"
             f"{final_changes_fr_display}\n\n" # Changements
         )
         if corrected_outro_fr:
@@ -317,7 +317,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
             translated_user_update = "received an update !"
             english_message_parts.append(
                 f"{TEST_EMOJI} <@1335228717403996160> {translated_user_update}\n\n" # User mention and update
-                f"Here are the changes and improvements we've made:\n"
+                f"Here are the changes and improvements we've made:\n\n"
                 f"{translated_changes}\n\n" # Changes
             )
             if translated_outro:
