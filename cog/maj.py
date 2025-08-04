@@ -291,7 +291,6 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
         
         french_message_parts.append(
             f"{TEST_EMOJI} <@1335228717403996160> a reçu une mise à jour !\n\n" # Mention utilisateur et maj
-            f"Voici les changements et améliorations que nous avons apportés :\n\n"
             f"{final_changes_fr_display}\n\n" # Changements
         )
         if corrected_outro_fr:
@@ -317,7 +316,6 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
             translated_user_update = "received an update !"
             english_message_parts.append(
                 f"{TEST_EMOJI} <@1335228717403996160> {translated_user_update}\n\n" # User mention and update
-                f"Here are the changes and improvements we've made:\n\n"
                 f"{translated_changes}\n\n" # Changes
             )
             if translated_outro:
