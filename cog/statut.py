@@ -94,11 +94,15 @@ class Statut(commands.Cog):
                 log.error(f"Erreur inattendue lors du changement de nom du canal: {e}")
                 return False
 
-    async def _send_and_delete_ping(self, channel, role_id, status_text=""):
+    async def _send_and_delete_ping(channel, role_id, status_text=""):
         """
         Envoie un message avec une mention de rôle dans le canal spécifié,
-        puis le supprime après un court délai.
+        puis le supprime après un court délai, sauf pour les statuts "maintenance" et "automatique".
         """
+        if status_text in ["maintenance", "automatique"]:
+            log.debug(f"Ping ignoré pour le statut: {status_text}")
+            return # Ne rien faire pour ces statuts
+
         try:
             # Le message de ping peut être générique ou inclure le statut
             ping_content = f"<@&{role_id}> Le bot vient de passer {status_text}." if status_text else f"<@&{role_id}> Un changement de statut du bot a eu lieu."
