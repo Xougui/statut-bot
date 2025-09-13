@@ -18,7 +18,6 @@ BOT_ID = PARAM.BOT_ID
 CHANNEL_ID = PARAM.CHANNEL_ID
 MESSAGE_ID = PARAM.MESSAGE_ID
 LOGS_CHANNEL_ID = PARAM.LOGS_CHANNEL_ID
-PING_ROLE_ID = PARAM.ROLE_ID
 
 # Couleurs et emojis pour les différents statuts
 OFFLINE_EMOJI = PARAM.offline # Exemple: 🔴
@@ -46,7 +45,7 @@ class Statut(commands.Cog):
         self.CHANNEL_ID = CHANNEL_ID
         self.MESSAGE_ID = MESSAGE_ID
         self.LOGS_CHANNEL_ID = LOGS_CHANNEL_ID
-        self.PING_ROLE_ID = PING_ROLE_ID
+        self.PING_ROLE_ID = PARAM.ROLE_ID
         # Stocke le dernier statut connu (True pour online, False pour offline, None pour maintenance)
         self._last_known_status = None # True: online, False: offline, "maintenance": maintenance
         # Stocke le dernier titre d'embed affiché pour éviter les mises à jour redondantes d'embed
@@ -94,7 +93,7 @@ class Statut(commands.Cog):
                 log.error(f"Erreur inattendue lors du changement de nom du canal: {e}")
                 return False
 
-    async def _send_and_delete_ping(channel, role_id, status_text=""):
+    async def _send_and_delete_ping(self, channel, status_text=""):
         """
         Envoie un message avec une mention de rôle dans le canal spécifié,
         puis le supprime après un court délai, sauf pour les statuts "maintenance" et "automatique".
@@ -105,11 +104,11 @@ class Statut(commands.Cog):
 
         try:
             # Le message de ping peut être générique ou inclure le statut
-            ping_content = f"<@&{role_id}> Le bot vient de passer {status_text}." if status_text else f"<@&{role_id}> Un changement de statut du bot a eu lieu."
+            ping_content = f"<@&{self.PING_ROLE_ID}> Le bot vient de passer {status_text}." if status_text else f"<@&{self.PING_ROLE_ID}> Un changement de statut du bot a eu lieu."
             ping_message = await channel.send(content=ping_content)
             await asyncio.sleep(2) # Attendre 2 secondes
             await ping_message.delete()
-            log.info(f"Ping du rôle <@&{role_id}> envoyé et supprimé dans #{channel.name}.")
+            log.info(f"Ping du rôle <@&{self.PING_ROLE_ID}> envoyé et supprimé dans #{channel.name}.")
         except discord.HTTPException as e:
             log.error(f"Erreur HTTP lors de l'envoi/suppression du ping: {e}")
         except Exception as e:
@@ -287,7 +286,7 @@ class Statut(commands.Cog):
 
             # Mention
             status_ping_text = "en ligne" if is_target_bot_online else "hors ligne"
-            await self._send_and_delete_ping(channel, self.PING_ROLE_ID, status_ping_text)
+            await self._send_and_delete_ping(channel, status_ping_text)
 
             # Met à jour le dernier statut connu après un changement
             self._last_known_status = is_target_bot_online
@@ -421,7 +420,7 @@ class Statut(commands.Cog):
             # Mention quand le bot change de statut (manuellement)
             # Le ping est envoyé si le statut a réellement changé ou si l'embed a été mis à jour
             if temp_last_known_status != self._last_known_status or (message.embeds and message.embeds[0].title != new_embed.title):
-                await self._send_and_delete_ping(channel, self.PING_ROLE_ID, target_status_type)
+                await self._send_and_delete_ping(channel, target_status_type)
 
             # Met à jour le dernier statut connu après un changement manuel
             self._last_known_status = temp_last_known_status
