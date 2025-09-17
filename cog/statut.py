@@ -41,6 +41,7 @@ class Statut(commands.Cog):
         self.bot = bot
         self._last_known_status: Status | None = None
         self._manual_status_override = False
+        self._update_lock = asyncio.Lock()
         self.check_bot_status.start()
 
     def cog_unload(self):
@@ -84,8 +85,8 @@ class Statut(commands.Cog):
             log.error(f"Erreur HTTP lors de la mise à jour de l'embed: {e}")
             return False
 
-    async def _update_channel_name(self, channel: discord.TextChannel, status: Status) -> bool:
-        """Met à jour le nom du salon de statut avec gestion des rate limits."""
+    async def _update_channel_name(self, channel: discord.TextChannel, status: Status, interaction: discord.Interaction | None = None, progress_log: list | None = None) -> bool:
+        """Met à jour le nom du salon de statut avec gestion des rate limits et feedback optionnel."""
         name_map = {
             Status.ONLINE: "═🟢・online",
             Status.OFFLINE: "═🔴・offline",
@@ -94,7 +95,6 @@ class Statut(commands.Cog):
         new_name = name_map.get(status)
 
         if not new_name or channel.name == new_name:
-            log.debug(f"Nom du salon déjà à jour ('{channel.name}') ou statut invalide. Aucune action.")
             return True
 
         while True:
@@ -105,16 +105,29 @@ class Statut(commands.Cog):
             except discord.HTTPException as e:
                 if e.status == 429:
                     retry_after = e.retry_after or 5.0
-                    log.warning(f"Rate limited pour le changement de nom. Réessai dans {retry_after:.2f}s.")
+                    log.warning(f"Rate limited (channel name): waiting {retry_after:.2f}s.")
+                    if interaction and progress_log:
+                        try:
+                            progress_log.append(f"⏳ Nom du salon rate limited. Réessai dans {retry_after:.2f}s...")
+                            await interaction.edit_original_response(content="\n".join(progress_log))
+                        except discord.HTTPException:
+                            pass # Ignore if we can't edit the message
+
                     await asyncio.sleep(retry_after)
+
+                    if interaction and progress_log:
+                        try:
+                            progress_log.pop() # Remove the rate limit message
+                        except IndexError:
+                            pass # Ignore if list is empty for some reason
                 elif e.status == 403:
-                    log.error("Erreur 403 (Permissions insuffisantes) lors du changement de nom du salon. Vérifiez la permission 'Gérer les salons'.")
-                    return False # Pas la peine de réessayer si les permissions sont manquantes.
+                    log.error("Erreur 403 (Permissions) pour changer le nom du salon.")
+                    return False
                 else:
-                    log.error(f"Erreur HTTP ({e.status}) lors du changement de nom: {e}")
+                    log.error(f"Erreur HTTP ({e.status}) en changeant le nom du salon: {e}")
                     return False
             except Exception as e:
-                log.error(f"Erreur inattendue lors du changement de nom: {e}")
+                log.error(f"Erreur inattendue en changeant le nom du salon: {e}")
                 return False
 
     async def _send_log(self, logs_channel: discord.TextChannel, status: Status, manual: bool):
@@ -163,55 +176,52 @@ class Statut(commands.Cog):
     @tasks.loop(seconds=5)
     async def check_bot_status(self):
         """Vérifie périodiquement le statut du bot et met à jour si nécessaire."""
-        if self._manual_status_override:
-            log.debug("Vérification auto. ignorée (mode manuel actif).")
-            return
+        async with self._update_lock:
+            if self._manual_status_override:
+                log.debug("Vérification auto. ignorée (mode manuel actif).")
+                return
 
-        await self.bot.wait_until_ready()
+            await self.bot.wait_until_ready()
 
-        target_bot_member = None
-        for guild in self.bot.guilds:
-            member = guild.get_member(BOT_ID)
-            if member:
-                target_bot_member = member
-                break
+            target_bot_member = None
+            for guild in self.bot.guilds:
+                member = guild.get_member(BOT_ID)
+                if member:
+                    target_bot_member = member
+                    break
 
-        if not target_bot_member:
-            log.warning(f"Bot cible (ID: {BOT_ID}) introuvable. Assurez-vous qu'il partage un serveur avec ce bot.")
-            # Si le bot n'est trouvé nulle part, on ne peut pas déterminer son statut.
-            # On arrête ici pour éviter de le marquer incorrectement comme hors ligne.
-            return
+            if not target_bot_member:
+                log.warning(f"Bot cible (ID: {BOT_ID}) introuvable. Assurez-vous qu'il partage un serveur avec ce bot.")
+                return
 
-        is_online = target_bot_member.status != discord.Status.offline
+            is_online = target_bot_member.status != discord.Status.offline
 
-        current_status = Status.ONLINE if is_online else Status.OFFLINE
+            current_status = Status.ONLINE if is_online else Status.OFFLINE
 
-        # Mettre à jour seulement si le statut a changé
-        if current_status == self._last_known_status:
-            return
+            if current_status == self._last_known_status:
+                return
 
-        log.info(f"Changement de statut auto. détecté: {self._last_known_status} -> {current_status.name}")
+            log.info(f"Changement de statut auto. détecté: {self._last_known_status} -> {current_status.name}")
 
-        channel = self.bot.get_channel(CHANNEL_ID)
-        logs_channel = self.bot.get_channel(LOGS_CHANNEL_ID)
-        if not channel:
-            log.error(f"Canal de statut (ID: {CHANNEL_ID}) introuvable.")
-            return
+            channel = self.bot.get_channel(CHANNEL_ID)
+            logs_channel = self.bot.get_channel(LOGS_CHANNEL_ID)
+            if not channel:
+                log.error(f"Canal de statut (ID: {CHANNEL_ID}) introuvable.")
+                return
 
-        try:
-            message = await channel.fetch_message(MESSAGE_ID)
-        except (discord.NotFound, discord.Forbidden) as e:
-            log.error(f"Impossible de trouver/récupérer le message de statut (ID: {MESSAGE_ID}). Erreur: {e}")
-            return
+            try:
+                message = await channel.fetch_message(MESSAGE_ID)
+            except (discord.NotFound, discord.Forbidden) as e:
+                log.error(f"Impossible de trouver/récupérer le message de statut (ID: {MESSAGE_ID}). Erreur: {e}")
+                return
 
-        # Exécuter les mises à jour
-        await self._update_embed(message, current_status)
-        await self._update_channel_name(channel, current_status)
-        if logs_channel:
-            await self._send_log(logs_channel, current_status, manual=False)
-        await self._send_ping(channel, current_status)
+            await self._update_embed(message, current_status)
+            await self._update_channel_name(channel, current_status)
+            if logs_channel:
+                await self._send_log(logs_channel, current_status, manual=False)
+            await self._send_ping(channel, current_status)
 
-        self._last_known_status = current_status
+            self._last_known_status = current_status
 
     @check_bot_status.before_loop
     async def before_check(self):
@@ -300,10 +310,12 @@ class Statut(commands.Cog):
         await interaction.edit_original_response(content="\n".join(progress))
 
         # 2. Update channel name
-        if await self._update_channel_name(channel, target_status):
+        if await self._update_channel_name(channel, target_status, interaction=interaction, progress_log=progress):
             progress.append("✅ Nom du salon mis à jour.")
         else:
             progress.append("❌ Échec de la mise à jour du nom du salon.")
+
+        # On met à jour la réponse, même si la liste de progression n'a pas changé (au cas où un message de rate limit a été retiré)
         await interaction.edit_original_response(content="\n".join(progress))
 
         # 3. Send log
