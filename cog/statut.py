@@ -183,7 +183,7 @@ class Statut(commands.Cog):
             return
 
         is_online = target_bot_member.status != discord.Status.offline
-        
+
         current_status = Status.ONLINE if is_online else Status.OFFLINE
 
         # Mettre à jour seulement si le statut a changé
@@ -215,7 +215,34 @@ class Statut(commands.Cog):
 
     @check_bot_status.before_loop
     async def before_check(self):
+        """Initialise l'état interne du bot en lisant le message de statut existant."""
         await self.bot.wait_until_ready()
+        log.info("Initialisation du statut avant le démarrage de la boucle...")
+
+        channel = self.bot.get_channel(CHANNEL_ID)
+        if not channel:
+            log.error(f"Canal de statut (ID: {CHANNEL_ID}) introuvable. Impossible d'initialiser l'état.")
+            return
+
+        try:
+            message = await channel.fetch_message(MESSAGE_ID)
+            if message.embeds and message.embeds[0].title:
+                title = message.embeds[0].title.lower()
+                if "en ligne" in title:
+                    self._last_known_status = Status.ONLINE
+                elif "hors ligne" in title:
+                    self._last_known_status = Status.OFFLINE
+                elif "en maintenance" in title:
+                    self._last_known_status = Status.MAINTENANCE
+
+                if self._last_known_status:
+                    log.info(f"Statut initialisé à partir du message existant : {self._last_known_status.name}")
+                else:
+                    log.warning("Impossible de déduire le statut depuis le titre de l'embed existant.")
+            else:
+                log.warning("Aucun embed ou titre trouvé dans le message de statut pour l'initialisation.")
+        except (discord.NotFound, discord.Forbidden):
+            log.warning(f"Message de statut (ID: {MESSAGE_ID}) non trouvé/accessible. Le statut sera mis à jour au premier cycle si nécessaire.")
 
     # --- Commande manuelle ---
 
