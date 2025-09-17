@@ -1,435 +1,303 @@
 import discord
 from discord.ext import commands, tasks
-from discord import app_commands # Importe app_commands
+from discord import app_commands
 import datetime
 import pytz
 import asyncio
 import logging
-from enum import Enum # Importe Enum pour les choix de statut
+from enum import Enum
 
-import PARAM # Importe les variables de configuration depuis le fichier PARAM.py
+import PARAM
 
-# Configuration du logger pour afficher les messages de rate limit
+# --- Configuration du logging ---
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger('discord')
 
-# --- CONFIGURATION (chargée depuis PARAM.py) ---
+# --- Constantes ---
 BOT_ID = PARAM.BOT_ID
 CHANNEL_ID = PARAM.CHANNEL_ID
 MESSAGE_ID = PARAM.MESSAGE_ID
 LOGS_CHANNEL_ID = PARAM.LOGS_CHANNEL_ID
+PING_ROLE_ID = PARAM.ROLE_ID
 
-# Couleurs et emojis pour les différents statuts
-OFFLINE_EMOJI = PARAM.offline # Exemple: 🔴
-ONLINE_EMOJI = PARAM.online   # Exemple: 🟢
-MAINTENANCE_EMOJI = PARAM.maintenance # Exemple: 🛠️
+OFFLINE_EMOJI = PARAM.offline
+ONLINE_EMOJI = PARAM.online
+MAINTENANCE_EMOJI = PARAM.maintenance
 
-# Définition des couleurs hexadécimales
-COLOR_OFFLINE = 0xFF3131 # #ff3131
-COLOR_ONLINE = 0x00BF63  # #00bf63
-COLOR_MAINTENANCE = 0x004AAD # #004aad
+COLOR_OFFLINE = 0xFF3131
+COLOR_ONLINE = 0x00BF63
+COLOR_MAINTENANCE = 0x004AAD
 
-tz = pytz.timezone('Europe/Paris') # Définition du fuseau horaire
+PARIS_TZ = pytz.timezone('Europe/Paris')
 
-# Enum pour les choix de statut de la commande de slash
-class BotStatus(Enum):
+# --- Énumération pour les statuts possibles ---
+class Status(Enum):
     ONLINE = "online"
     OFFLINE = "offline"
     MAINTENANCE = "maintenance"
-    AUTOMATIC = "automatique" # Pour revenir au mode de vérification automatique
 
 class Statut(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.BOT_ID = BOT_ID
-        self.CHANNEL_ID = CHANNEL_ID
-        self.MESSAGE_ID = MESSAGE_ID
-        self.LOGS_CHANNEL_ID = LOGS_CHANNEL_ID
-        self.PING_ROLE_ID = PARAM.ROLE_ID
-        # Stocke le dernier statut connu (True pour online, False pour offline, None pour maintenance)
-        self._last_known_status = None # True: online, False: offline, "maintenance": maintenance
-        # Stocke le dernier titre d'embed affiché pour éviter les mises à jour redondantes d'embed
-        self._last_embed_title = None
-        # Indicateur pour savoir si le statut est géré manuellement ou automatiquement
-        self._manual_status_override = False # True si le statut est défini manuellement, False si automatique
-
-        # Lance la tâche de vérification du statut
+        self._last_known_status: Status | None = None
+        self._manual_status_override = False
         self.check_bot_status.start()
 
     def cog_unload(self):
-        # Annule la tâche lorsque le cog est déchargé
         self.check_bot_status.cancel()
 
-    async def _change_channel_name_with_retry(self, channel, new_name):
-        """
-        Tente de changer le nom du canal avec une gestion des rate limits,
-        uniquement si le nom actuel est différent du nouveau nom.
-        """
-        # Ajout de logs pour le débogage du changement de nom
-        log.info(f"Tentative de changement de nom du canal '{channel.name}' en '{new_name}'.")
+    # --- Fonctions de mise à jour individuelles ---
 
-        if channel.name == new_name:
-            # Le nom du canal est déjà correct, pas besoin de le changer
-            log.debug(f"Nom du canal déjà '{new_name}'. Aucune modification nécessaire.")
+    async def _update_embed(self, message: discord.Message, status: Status) -> bool:
+        """Met à jour l'embed du message de statut."""
+        maj = datetime.datetime.now(PARIS_TZ).strftime('%d/%m/%Y %H:%M:%S')
+
+        embed_builders = {
+            Status.ONLINE: lambda: discord.Embed(
+                title=f"{ONLINE_EMOJI}・**Bot en ligne**",
+                description=f"Le bot **Lyxios** est **en ligne** et toutes ses commandes et modules sont opérationnels !\n> Check ça pour savoir si le bot est `offline` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi .",
+                color=COLOR_ONLINE
+            ),
+            Status.OFFLINE: lambda: discord.Embed(
+                title=f"{OFFLINE_EMOJI}・**Bot hors ligne**",
+                description=f"Le bot **Lyxios** est **hors ligne**.\n\n> Ne vous inquiétez pas, le bot reviendra en ligne !\n> Check ça pour savoir si le bot est `online` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi\n-# Merci de votre patience.",
+                color=COLOR_OFFLINE
+            ),
+            Status.MAINTENANCE: lambda: discord.Embed(
+                title=f"{MAINTENANCE_EMOJI}・**Bot en maintenance**",
+                description=f"Le bot **Lyxios** est actuellement en **maintenance**.\n\n> Il sera de retour dès que possible. Merci de votre compréhension.",
+                color=COLOR_MAINTENANCE
+            ),
+        }
+
+        builder = embed_builders.get(status)
+        if not builder:
+            return False
+
+        new_embed = builder().set_footer(text=f"Mis à jour le: {maj}")
+
+        try:
+            await message.edit(embed=new_embed)
+            log.info(f"Embed de statut mis à jour à: {status.name}")
+            return True
+        except discord.HTTPException as e:
+            log.error(f"Erreur HTTP lors de la mise à jour de l'embed: {e}")
+            return False
+
+    async def _update_channel_name(self, channel: discord.TextChannel, status: Status) -> bool:
+        """Met à jour le nom du salon de statut avec gestion des rate limits."""
+        name_map = {
+            Status.ONLINE: "═🟢・online",
+            Status.OFFLINE: "═🔴・offline",
+            Status.MAINTENANCE: "═🔵・maintenance",
+        }
+        new_name = name_map.get(status)
+
+        if not new_name or channel.name == new_name:
+            log.debug(f"Nom du salon déjà à jour ('{channel.name}') ou statut invalide. Aucune action.")
             return True
 
         while True:
             try:
                 await channel.edit(name=new_name)
-                log.info(f"Nom du canal changé en '{new_name}'.")
-                return True # Succès
+                log.info(f"Nom du salon changé en '{new_name}'.")
+                return True
             except discord.HTTPException as e:
                 if e.status == 429:
-                    retry_after = e.retry_after if e.retry_after else 5 # Utilise retry_after ou une valeur par défaut
-                    log.warning(f"Rate limited lors du changement de nom du canal. Réessai dans {retry_after:.2f} secondes.")
+                    retry_after = e.retry_after or 5.0
+                    log.warning(f"Rate limited pour le changement de nom. Réessai dans {retry_after:.2f}s.")
                     await asyncio.sleep(retry_after)
-                elif e.status == 403: # Erreur 403: Forbidden (permissions manquantes)
-                    log.error(f"Erreur 403 (Permissions insuffisantes) lors du changement de nom du canal '{channel.name}' en '{new_name}'. Vérifiez la permission 'Gérer les salons'.")
-                    return False
+                elif e.status == 403:
+                    log.error("Erreur 403 (Permissions insuffisantes) lors du changement de nom du salon. Vérifiez la permission 'Gérer les salons'.")
+                    return False # Pas la peine de réessayer si les permissions sont manquantes.
                 else:
-                    log.error(f"Erreur HTTP ({e.status}) lors du changement de nom du canal: {e}")
-                    return False # Échec pour une autre raison
+                    log.error(f"Erreur HTTP ({e.status}) lors du changement de nom: {e}")
+                    return False
             except Exception as e:
-                log.error(f"Erreur inattendue lors du changement de nom du canal: {e}")
+                log.error(f"Erreur inattendue lors du changement de nom: {e}")
                 return False
 
-    async def _send_and_delete_ping(self, channel, status_text=""):
-        """
-        Envoie un message avec une mention de rôle dans le canal spécifié,
-        puis le supprime après un court délai, sauf pour les statuts "maintenance" et "automatique".
-        """
-        if status_text in ["maintenance", "automatique"]:
-            log.debug(f"Ping ignoré pour le statut: {status_text}")
-            return # Ne rien faire pour ces statuts
+    async def _send_log(self, logs_channel: discord.TextChannel, status: Status, manual: bool):
+        """Envoie un message de log pour le changement de statut."""
+        emoji_map = {
+            Status.ONLINE: ONLINE_EMOJI,
+            Status.OFFLINE: OFFLINE_EMOJI,
+            Status.MAINTENANCE: MAINTENANCE_EMOJI,
+        }
+
+        log_embed = discord.Embed(
+            title=f"{emoji_map.get(status)}・Bot {status.value}",
+            description=f"Le bot est maintenant **{status.value}**.",
+            color=COLOR_ONLINE if status == Status.ONLINE else COLOR_OFFLINE if status == Status.OFFLINE else COLOR_MAINTENANCE
+        )
+        if manual:
+            log_embed.description += " (défini manuellement)"
 
         try:
-            # Le message de ping peut être générique ou inclure le statut
-            ping_content = f"<@&{self.PING_ROLE_ID}> Le bot vient de passer {status_text}." if status_text else f"<@&{self.PING_ROLE_ID}> Un changement de statut du bot a eu lieu."
+            await logs_channel.send(embed=log_embed)
+            log.info(f"Message de log envoyé pour le statut {status.name}.")
+            return True
+        except discord.HTTPException as e:
+            log.error(f"Erreur HTTP lors de l'envoi du log: {e}")
+            return False
+
+    async def _send_ping(self, channel: discord.TextChannel, status: Status):
+        """Envoie une mention de rôle temporaire, sauf pour la maintenance."""
+        if status == Status.MAINTENANCE:
+            log.debug("Ping ignoré pour le statut de maintenance.")
+            return True
+
+        try:
+            ping_content = f"<@&{PING_ROLE_ID}> Le bot vient de passer {status.value}."
             ping_message = await channel.send(content=ping_content)
-            await asyncio.sleep(2) # Attendre 2 secondes
+            await asyncio.sleep(2)
             await ping_message.delete()
-            log.info(f"Ping du rôle <@&{self.PING_ROLE_ID}> envoyé et supprimé dans #{channel.name}.")
+            log.info(f"Ping du rôle <@&{PING_ROLE_ID}> envoyé et supprimé.")
+            return True
         except discord.HTTPException as e:
             log.error(f"Erreur HTTP lors de l'envoi/suppression du ping: {e}")
-        except Exception as e:
-            log.error(f"Erreur inattendue lors de l'envoi/suppression du ping: {e}")
+            return False
 
-    def _create_status_embed(self, status_type: str, maj: str):
-        """
-        Crée et retourne un objet discord.Embed basé sur le type de statut.
-        status_type peut être "online", "offline", ou "maintenance".
-        """
-        if status_type == "online":
-            return discord.Embed(
-                title=f"{ONLINE_EMOJI}・**Bot en ligne**",
-                description=f"Le bot **Lyxios** est **en ligne** et toutes ses commandes et modules sont opérationnels !\n> Check ça pour savoir si le bot est `offline` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi .",
-                color=COLOR_ONLINE
-            ).set_footer(text=f"Mis à jour le: {maj}")
-        elif status_type == "offline":
-            return discord.Embed(
-                title=f"{OFFLINE_EMOJI}・**Bot hors ligne**",
-                description=f"Le bot **Lyxios** est **hors ligne**.\n\n> Ne vous inquiétez pas, le bot reviendra en ligne !\n> Check ça pour savoir si le bot est `online` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi\n-# Merci de votre patience.",
-                color=COLOR_OFFLINE
-            ).set_footer(text=f"Mis à jour le: {maj}")
-        elif status_type == "maintenance":
-            return discord.Embed(
-                title=f"{MAINTENANCE_EMOJI}・**Bot en maintenance**",
-                description=f"Le bot **Lyxios** est actuellement en **maintenance**.\n\n> Il sera de retour dès que possible. Merci de votre compréhension.",
-                color=COLOR_MAINTENANCE
-            ).set_footer(text=f"Mis à jour le: {maj}")
-        else:
-            # Fallback pour un statut inconnu, bien que l'enum devrait l'empêcher
-            return discord.Embed(
-                title="❓・**Statut inconnu**",
-                description="Le statut du bot est indéterminé.",
-                color=0x808080
-            ).set_footer(text=f"Mis à jour le: {maj}")
+    # --- Tâche de vérification automatique ---
 
-
-    @tasks.loop(seconds=2) # Intervalle de 2 secondes
+    @tasks.loop(seconds=5)
     async def check_bot_status(self):
-        """
-        Vérifie le statut du bot cible et met à jour le message et le nom du canal.
-        Si le message n'est pas trouvé, il en crée un nouveau.
-        Cette tâche est ignorée si le statut est en mode manuel (maintenance, ou online/offline manuel).
-        """
+        """Vérifie périodiquement le statut du bot et met à jour si nécessaire."""
         if self._manual_status_override:
-            log.debug("La vérification automatique du statut est ignorée car le statut est géré manuellement.")
+            log.debug("Vérification auto. ignorée (mode manuel actif).")
             return
 
-        await self.bot.wait_until_ready() # Attend que le bot soit prêt
+        await self.bot.wait_until_ready()
 
-        channel = self.bot.get_channel(self.CHANNEL_ID)
-        if not channel:
-            log.error(f"Canal avec l'ID {self.CHANNEL_ID} introuvable. Veuillez vérifier l'ID dans PARAM.py.")
-            return
-
-        message = None
-        # Cherche le bot cible dans les serveurs où le bot de surveillance est présent
         target_bot_member = None
         for guild in self.bot.guilds:
-            target_bot_member = guild.get_member(self.BOT_ID)
-            if target_bot_member:
+            member = guild.get_member(BOT_ID)
+            if member:
+                target_bot_member = member
                 break
 
-        is_target_bot_online = False
-        if target_bot_member:
-            # Si le membre est trouvé, vérifie son statut
-            is_target_bot_online = target_bot_member.status != discord.Status.offline
-        else:
-            log.warning(f"Le bot cible avec l'ID {self.BOT_ID} n'a pas été trouvé dans les serveurs du bot actuel. Impossible de vérifier son statut. Assurez-vous que le bot cible est dans au moins un serveur commun.")
-
-        try:
-            message = await channel.fetch_message(self.MESSAGE_ID)
-        except discord.NotFound:
-            log.warning(f"Message avec l'ID {self.MESSAGE_ID} introuvable dans le canal {self.CHANNEL_ID}. Création d'un nouveau message.")
-            maj = datetime.datetime.now(tz).strftime('%d/%m/%Y %H:%M:%S')
-            
-            # Détermine le statut initial pour le nouvel embed
-            initial_status_type = "online" if is_target_bot_online else "offline"
-            new_embed = self._create_status_embed(initial_status_type, maj)
-            
-            try:
-                new_message = await channel.send(embed=new_embed)
-                self.MESSAGE_ID = new_message.id # Met à jour l'ID du message pour les futures mises à jour
-                message = new_message # Utilise le nouveau message pour la suite de la logique
-                log.info(f"Nouveau message de statut créé avec l'ID: {self.MESSAGE_ID}")
-                
-                # Met à jour le dernier statut et titre d'embed connu après la création
-                self._last_known_status = is_target_bot_online
-                self._last_embed_title = new_embed.title
-                
-                # Le nom du canal doit être mis à jour même à la création si ce n'est pas déjà le cas
-                channel_new_name = "═🟢・online" if is_target_bot_online else "═🔴・offline"
-                # Attendre que le changement de nom soit terminé
-                await self._change_channel_name_with_retry(channel, channel_new_name)
-
-                return # Sortir après la création et l'initialisation pour éviter les actions redondantes
-            except discord.HTTPException as e:
-                log.error(f"Erreur HTTP lors de la création du nouveau message: {e}")
-                return
-            except Exception as e:
-                log.error(f"Erreur inattendue lors de la création du nouveau message: {e}")
-                return
-        except discord.Forbidden:
-            log.error(f"Permissions insuffisantes pour récupérer le message dans le canal {self.CHANNEL_ID}. Le bot a-t-il les permissions de lecture de l'historique ?")
-            return
-        except Exception as e:
-            log.error(f"Erreur inattendue lors de la récupération du message: {e}")
+        if not target_bot_member:
+            log.warning(f"Bot cible (ID: {BOT_ID}) introuvable. Assurez-vous qu'il partage un serveur avec ce bot.")
+            # Si le bot n'est trouvé nulle part, on ne peut pas déterminer son statut.
+            # On arrête ici pour éviter de le marquer incorrectement comme hors ligne.
             return
 
-        logs_channel = self.bot.get_channel(self.LOGS_CHANNEL_ID)
-        if not logs_channel:
-            log.warning(f"Canal de logs avec l'ID {self.LOGS_CHANNEL_ID} introuvable. Les messages de log ne seront pas envoyés.")
-
-        # --- Début de la logique de vérification et de mise à jour ---
-
-        # Si c'est la première exécution de la tâche et que le message existait déjà,
-        # initialiser les états sans déclencher de notifications.
-        if self._last_known_status is None:
-            self._last_known_status = is_target_bot_online
-            if message.embeds:
-                self._last_embed_title = message.embeds[0].title
-            log.info(f"Initialisation du statut connu du bot à {'en ligne' if is_target_bot_online else 'hors ligne'}.")
-            return # Sortir pour éviter les actions sur la première itération (initialisation)
-
-        maj = datetime.datetime.now(tz).strftime('%d/%m/%Y %H:%M:%S')
+        is_online = target_bot_member.status != discord.Status.offline
         
-        # Détermine le statut pour le nouvel embed basé sur la détection automatique
-        current_status_type = "online" if is_target_bot_online else "offline"
-        new_embed = self._create_status_embed(current_status_type, maj)
-        
-        # Détermine si une mise à jour est nécessaire
-        # Une mise à jour est nécessaire si le statut a changé OU si l'embed affiché est incorrect
-        needs_update = False
-        
-        # Si le statut détecté est différent du dernier statut connu (qui pourrait être online/offline ou maintenance)
-        if (is_target_bot_online and self._last_known_status is not True) or \
-           (not is_target_bot_online and self._last_known_status is not False):
-            needs_update = True
-            log.debug(f"Statut du bot cible a changé de {self._last_known_status} à {'en ligne' if is_target_bot_online else 'hors ligne'}.")
-        
-        # Vérifie si l'embed affiché est incorrect, même si le statut n'a pas changé (par exemple, si on passe de manuel à automatique)
-        current_embed_title = message.embeds[0].title if message.embeds else None
-        if current_embed_title != new_embed.title:
-            needs_update = True
-            log.info(f"Le titre de l'embed est incorrect (actuel: '{current_embed_title}', attendu: '{new_embed.title}'). Mise à jour forcée de l'embed.")
+        current_status = Status.ONLINE if is_online else Status.OFFLINE
 
-        if needs_update:
-            # Mise à jour de l'embed
-            try:
-                await message.edit(content="", embed=new_embed)
-                log.info(f"Embed du statut mis à jour pour le bot cible: {new_embed.title}")
-                self._last_embed_title = new_embed.title # Met à jour le dernier titre d'embed connu
-            except discord.HTTPException as e:
-                log.error(f"Erreur HTTP lors de la mise à jour de l'embed du statut: {e}")
-            except Exception as e:
-                log.error(f"Erreur inattendue lors de la mise à jour de l'embed du statut: {e}")
+        # Mettre à jour seulement si le statut a changé
+        if current_status == self._last_known_status:
+            return
 
-            # Envoie le log
-            if logs_channel:
-                log_embed = self._create_status_embed(current_status_type, maj)
-                log_embed.title = f"{ONLINE_EMOJI if is_target_bot_online else OFFLINE_EMOJI}・Bot {'en ligne' if is_target_bot_online else 'hors ligne'}"
-                log_embed.description = f"Le bot est **{'en ligne' if is_target_bot_online else 'hors ligne'}**"
-                try:
-                    await logs_channel.send(embed=log_embed)
-                    log.info(f"Message de log envoyé: Bot {'en ligne' if is_target_bot_online else 'hors ligne'}")
-                except discord.HTTPException as e:
-                    log.error(f"Erreur HTTP lors de l'envoi du message de log: {e}")
-                except Exception as e:
-                    log.error(f"Erreur inattendue lors de l'envoi du message de log: {e}")
+        log.info(f"Changement de statut auto. détecté: {self._last_known_status} -> {current_status.name}")
 
-            # Gère le changement de nom du canal
-            channel_new_name = "═🟢・online" if is_target_bot_online else "═🔴・offline"
-            # Attendre que le changement de nom soit terminé
-            await self._change_channel_name_with_retry(channel, channel_new_name)
-
-            # Mention
-            status_ping_text = "en ligne" if is_target_bot_online else "hors ligne"
-            await self._send_and_delete_ping(channel, status_ping_text)
-
-            # Met à jour le dernier statut connu après un changement
-            self._last_known_status = is_target_bot_online
-        else:
-            log.debug(f"Le statut du bot cible n'a pas changé et l'embed est à jour ({current_status_type}). Aucune mise à jour nécessaire.")
-
-
-    @app_commands.command(name="statut", description="[🤖 Dev] Définit manuellement le statut du bot ou le remet en mode automatique.")
-    @app_commands.describe(status="Le statut à définir pour le bot.")
-    @app_commands.choices(status=[
-        app_commands.Choice(name="Online", value="online"),
-        app_commands.Choice(name="Offline", value="offline"),
-        app_commands.Choice(name="Maintenance", value="maintenance"),
-        app_commands.Choice(name="Automatique", value="automatique"),
-    ])
-    @commands.is_owner() # Seuls les propriétaires peuvent utiliser cette commande
-    async def set_statut_slash(self, interaction: discord.Interaction, status: BotStatus):
-        """
-        Commande de slash pour définir manuellement le statut du bot (online/offline/maintenance)
-        ou le remettre en mode automatique.
-        """
-        await interaction.response.defer(ephemeral=True) # Répond immédiatement pour éviter le timeout
-
-        channel = self.bot.get_channel(self.CHANNEL_ID)
+        channel = self.bot.get_channel(CHANNEL_ID)
+        logs_channel = self.bot.get_channel(LOGS_CHANNEL_ID)
         if not channel:
-            await interaction.followup.send(f"Erreur: Canal avec l'ID {self.CHANNEL_ID} introuvable. Veuillez vérifier PARAM.py.", ephemeral=True)
-            log.error(f"Erreur: Canal avec l'ID {self.CHANNEL_ID} introuvable dans set_statut_slash.")
+            log.error(f"Canal de statut (ID: {CHANNEL_ID}) introuvable.")
             return
 
-        message = None
         try:
-            message = await channel.fetch_message(self.MESSAGE_ID)
-        except discord.NotFound:
-            await interaction.followup.send(f"Erreur: Message avec l'ID {self.MESSAGE_ID} introuvable dans le canal {self.CHANNEL_ID}. Veuillez vérifier l'ID ou créer le message.", ephemeral=True)
-            log.error(f"Erreur: Message avec l'ID {self.MESSAGE_ID} introuvable dans le canal {self.CHANNEL_ID} dans set_statut_slash.")
-            return
-        except discord.Forbidden:
-            await interaction.followup.send(f"Erreur: Permissions insuffisantes pour récupérer le message dans le canal {self.CHANNEL_ID}.", ephemeral=True)
-            log.error(f"Erreur: Permissions insuffisantes pour récupérer le message dans le canal {self.CHANNEL_ID} dans set_statut_slash.")
-            return
-        except Exception as e:
-            await interaction.followup.send(f"Erreur inattendue lors de la récupération du message: {e}", ephemeral=True)
-            log.error(f"Erreur inattendue lors de la récupération du message dans set_statut_slash: {e}")
+            message = await channel.fetch_message(MESSAGE_ID)
+        except (discord.NotFound, discord.Forbidden) as e:
+            log.error(f"Impossible de trouver/récupérer le message de statut (ID: {MESSAGE_ID}). Erreur: {e}")
             return
 
-        logs_channel = self.bot.get_channel(self.LOGS_CHANNEL_ID)
-        if not logs_channel:
-            log.warning(f"Canal de logs avec l'ID {self.LOGS_CHANNEL_ID} introuvable. Les messages de log ne seront pas envoyés.")
+        # Exécuter les mises à jour
+        await self._update_embed(message, current_status)
+        await self._update_channel_name(channel, current_status)
+        if logs_channel:
+            await self._send_log(logs_channel, current_status, manual=False)
+        await self._send_ping(channel, current_status)
 
-        maj = datetime.datetime.now(tz).strftime('%d/%m/%Y %H:%M:%S')
+        self._last_known_status = current_status
 
-        # Gère le mode "automatique"
-        if status == BotStatus.AUTOMATIC:
+    @check_bot_status.before_loop
+    async def before_check(self):
+        await self.bot.wait_until_ready()
+
+    # --- Commande manuelle ---
+
+    @app_commands.command(name="statut", description="[🤖 Dev] Gère le statut du bot.")
+    @app_commands.describe(mode="Choisissez un mode manuel ou revenez à l'automatique.")
+    @app_commands.choices(mode=[
+        app_commands.Choice(name="🟢 Online", value="online"),
+        app_commands.Choice(name="🔴 Offline", value="offline"),
+        app_commands.Choice(name="🛠️ Maintenance", value="maintenance"),
+        app_commands.Choice(name="⚙️ Automatique", value="automatique"),
+    ])
+    @commands.is_owner()
+    async def set_status_slash(self, interaction: discord.Interaction, mode: app_commands.Choice[str]):
+        """Définit manuellement le statut ou revient en mode automatique."""
+        await interaction.response.defer(ephemeral=True)
+
+        if mode.value == "automatique":
             self._manual_status_override = False
-            if not self.check_bot_status.is_running():
-                self.check_bot_status.start() # Redémarre la tâche si elle était arrêtée
-            
-            # Force une vérification immédiate pour mettre à jour l'embed
-            # et le nom du canal via la tâche automatique
-            await self.check_bot_status()
-            
-            await interaction.followup.send("Le statut du bot est maintenant en mode **automatique**.", ephemeral=True)
-            log.info("Statut du bot remis en mode automatique.")
+            await interaction.followup.send("⚙️ Le statut du bot est de retour en mode **automatique**. Lancement d'une vérification...", ephemeral=True)
+            log.info("Mode manuel désactivé. Forçage de la vérification auto.")
+            await self.check_bot_status() # Force une vérification immédiate
             return
 
-        # Si un statut manuel est choisi
-        self._manual_status_override = True # Active le mode manuel
+        # --- Passage en mode manuel ---
+        self._manual_status_override = True
+        target_status = Status(mode.value)
+
+        # Ne rien faire si le statut demandé est déjà actif
+        if target_status == self._last_known_status:
+            await interaction.followup.send(f"Le bot est déjà en mode `{target_status.value}`.", ephemeral=True)
+            return
+
+        # Récupération des objets Discord
+        channel = self.bot.get_channel(CHANNEL_ID)
+        logs_channel = self.bot.get_channel(LOGS_CHANNEL_ID)
+        if not channel:
+            await interaction.followup.send(f"❌ Erreur: Canal de statut (ID: {CHANNEL_ID}) introuvable.", ephemeral=True)
+            return
         
-        # Détermine le type de statut pour l'embed et le nom du canal
-        target_status_type = status.value
-        new_embed = self._create_status_embed(target_status_type, maj)
+        try:
+            message = await channel.fetch_message(MESSAGE_ID)
+        except (discord.NotFound, discord.Forbidden):
+            await interaction.followup.send(f"❌ Erreur: Message de statut (ID: {MESSAGE_ID}) introuvable.", ephemeral=True)
+            return
 
-        # Détermine le dernier statut connu pour la logique de ping/log
-        if target_status_type == "online":
-            temp_last_known_status = True
-        elif target_status_type == "offline":
-            temp_last_known_status = False
-        else: # maintenance
-            temp_last_known_status = "maintenance"
+        # Exécution avec retour progressif
+        progress = [f"⏳ **Passage en mode manuel : `{target_status.value}`...**"]
+        await interaction.edit_original_response(content="\n".join(progress))
 
-        # Détermine si une mise à jour est nécessaire (statut différent ou embed incorrect)
-        needs_update = False
-        if temp_last_known_status != self._last_known_status:
-            needs_update = True
-            log.debug(f"Changement de statut manuel détecté: de {self._last_known_status} à {temp_last_known_status}.")
-        
-        current_embed_title = message.embeds[0].title if message.embeds else None
-        if current_embed_title != new_embed.title:
-            needs_update = True
-            log.info(f"Le statut manuel est le même, mais le titre de l'embed est incorrect (actuel: '{current_embed_title}', attendu: '{new_embed.title}'). Mise à jour forcée de l'embed.")
-
-        if needs_update:
-            # Effectue la mise à jour de l'embed
-            try:
-                await message.edit(content="", embed=new_embed)
-                log.info(f"Embed du statut mis à jour manuellement à: {new_embed.title}")
-                self._last_embed_title = new_embed.title # Met à jour le dernier titre d'embed connu
-            except discord.HTTPException as e:
-                await interaction.followup.send(f"Erreur HTTP lors de la mise à jour manuelle de l'embed: {e}", ephemeral=True)
-                log.error(f"Erreur HTTP lors de la mise à jour manuelle de l'embed: {e}")
-            except Exception as e:
-                await interaction.followup.send(f"Erreur inattendue lors de la mise à jour manuelle de l'embed: {e}", ephemeral=True)
-                log.error(f"Erreur inattendue lors de la mise à jour manuelle de l'embed: {e}")
-
-            # Envoie le log
-            # Le log est envoyé si le statut a changé OU si l'embed a été mis à jour (même si le statut était déjà le même)
-            if logs_channel:
-                log_embed = self._create_status_embed(target_status_type, maj)
-                log_embed.title = f"{ONLINE_EMOJI if target_status_type == 'online' else (OFFLINE_EMOJI if target_status_type == 'offline' else MAINTENANCE_EMOJI)}・Bot {target_status_type}"
-                log_embed.description = f"Le bot est **{target_status_type}** (manuel)"
-                try:
-                    await logs_channel.send(embed=log_embed)
-                    log.info(f"Message de log manuel envoyé: Bot {target_status_type}")
-                except discord.HTTPException as e:
-                    log.error(f"Erreur HTTP lors de l'envoi du message de log manuel: {e}")
-                except Exception as e:
-                    log.error(f"Erreur inattendue lors de l'envoi du message de log manuel: {e}")
-
-            # Gère le changement de nom du canal
-            channel_new_name = ""
-            if target_status_type == "online":
-                channel_new_name = "═🟢・online"
-            elif target_status_type == "offline":
-                channel_new_name = "═🔴・offline"
-            elif target_status_type == "maintenance":
-                channel_new_name = "═🔵・maintenance" # Nouveau nom pour la maintenance
-            
-            # Attendre que le changement de nom soit terminé
-            await self._change_channel_name_with_retry(channel, channel_new_name)
-
-            # Mention quand le bot change de statut (manuellement)
-            # Le ping est envoyé si le statut a réellement changé ou si l'embed a été mis à jour
-            if temp_last_known_status != self._last_known_status or (message.embeds and message.embeds[0].title != new_embed.title):
-                await self._send_and_delete_ping(channel, target_status_type)
-
-            # Met à jour le dernier statut connu après un changement manuel
-            self._last_known_status = temp_last_known_status
-            await interaction.followup.send(f"Statut du bot mis à jour à `{status.value}`.", ephemeral=True)
+        # 1. Update embed
+        if await self._update_embed(message, target_status):
+            progress.append("✅ Message de statut mis à jour.")
         else:
-            # Si aucune mise à jour n'est nécessaire, on envoie quand même un followup pour terminer l'interaction
-            await interaction.followup.send(f"Le statut du bot est déjà `{status.value}` et l'embed est à jour. Aucune mise à jour nécessaire.", ephemeral=True)
+            progress.append("❌ Échec de la mise à jour du message.")
+        await interaction.edit_original_response(content="\n".join(progress))
 
+        # 2. Update channel name
+        if await self._update_channel_name(channel, target_status):
+            progress.append("✅ Nom du salon mis à jour.")
+        else:
+            progress.append("❌ Échec de la mise à jour du nom du salon.")
+        await interaction.edit_original_response(content="\n".join(progress))
+
+        # 3. Send log
+        if logs_channel:
+            if await self._send_log(logs_channel, target_status, manual=True):
+                progress.append("✅ Message de log envoyé.")
+            else:
+                progress.append("❌ Échec de l'envoi du log.")
+            await interaction.edit_original_response(content="\n".join(progress))
+
+        # 4. Send ping
+        if await self._send_ping(channel, target_status):
+            progress.append("✅ Notification envoyée.")
+        else:
+            progress.append("❌ Échec de l'envoi de la notification.")
+
+        progress.append(f"\n🎉 **Terminé !** Statut réglé sur `{target_status.value}`.")
+        await interaction.edit_original_response(content="\n".join(progress))
+
+        self._last_known_status = target_status
+        log.info(f"Statut manuel défini sur: {target_status.name}")
 
 async def setup(bot):
     await bot.add_cog(Statut(bot))
-
