@@ -50,9 +50,6 @@ class Statut(commands.Cog):
         self._last_known_status = None # True: online, False: offline, "maintenance": maintenance
         # Stocke le dernier titre d'embed affiché pour éviter les mises à jour redondantes d'embed
         self._last_embed_title = None
-        # Indicateur pour savoir si le statut est géré manuellement ou automatiquement
-        self._manual_status_override = False # True si le statut est défini manuellement, False si automatique
-
         # Lance la tâche de vérification du statut
         self.check_bot_status.start()
 
@@ -153,10 +150,6 @@ class Statut(commands.Cog):
         Si le message n'est pas trouvé, il en crée un nouveau.
         Cette tâche est ignorée si le statut est en mode manuel (maintenance, ou online/offline manuel).
         """
-        if self._manual_status_override:
-            log.debug("La vérification automatique du statut est ignorée car le statut est géré manuellement.")
-            return
-
         await self.bot.wait_until_ready() # Attend que le bot soit prêt
 
         channel = self.bot.get_channel(self.CHANNEL_ID)
@@ -235,25 +228,31 @@ class Statut(commands.Cog):
 
         maj = datetime.datetime.now(tz).strftime('%d/%m/%Y %H:%M:%S')
         
-        # Détermine le statut pour le nouvel embed basé sur la détection automatique
+        # Détermine le statut et le nom de canal attendus
         current_status_type = "online" if is_target_bot_online else "offline"
         new_embed = self._create_status_embed(current_status_type, maj)
+        expected_channel_name = "═🟢・online" if is_target_bot_online else "═🔴・offline"
         
         # Détermine si une mise à jour est nécessaire
-        # Une mise à jour est nécessaire si le statut a changé OU si l'embed affiché est incorrect
+        # Une mise à jour est nécessaire si le statut a changé, si l'embed est incorrect, OU si le nom du canal est incorrect.
         needs_update = False
         
-        # Si le statut détecté est différent du dernier statut connu (qui pourrait être online/offline ou maintenance)
+        # 1. Le statut a-t-il changé ?
         if (is_target_bot_online and self._last_known_status is not True) or \
            (not is_target_bot_online and self._last_known_status is not False):
             needs_update = True
             log.debug(f"Statut du bot cible a changé de {self._last_known_status} à {'en ligne' if is_target_bot_online else 'hors ligne'}.")
         
-        # Vérifie si l'embed affiché est incorrect, même si le statut n'a pas changé (par exemple, si on passe de manuel à automatique)
+        # 2. L'embed est-il incorrect ?
         current_embed_title = message.embeds[0].title if message.embeds else None
         if current_embed_title != new_embed.title:
             needs_update = True
-            log.info(f"Le titre de l'embed est incorrect (actuel: '{current_embed_title}', attendu: '{new_embed.title}'). Mise à jour forcée de l'embed.")
+            log.info(f"Le titre de l'embed est incorrect (actuel: '{current_embed_title}', attendu: '{new_embed.title}'). Mise à jour forcée.")
+
+        # 3. Le nom du canal est-il incorrect ?
+        if channel.name != expected_channel_name:
+            needs_update = True
+            log.info(f"Le nom du canal est incorrect (actuel: '{channel.name}', attendu: '{expected_channel_name}'). Mise à jour forcée.")
 
         if needs_update:
             # Mise à jour de l'embed
@@ -280,9 +279,8 @@ class Statut(commands.Cog):
                     log.error(f"Erreur inattendue lors de l'envoi du message de log: {e}")
 
             # Gère le changement de nom du canal
-            channel_new_name = "═🟢・online" if is_target_bot_online else "═🔴・offline"
             # Attendre que le changement de nom soit terminé
-            await self._change_channel_name_with_retry(channel, channel_new_name)
+            await self._change_channel_name_with_retry(channel, expected_channel_name)
 
             # Mention
             status_ping_text = "en ligne" if is_target_bot_online else "hors ligne"
@@ -340,7 +338,6 @@ class Statut(commands.Cog):
 
         # Gère le mode "automatique"
         if status == BotStatus.AUTOMATIC:
-            self._manual_status_override = False
             if not self.check_bot_status.is_running():
                 self.check_bot_status.start() # Redémarre la tâche si elle était arrêtée
             
@@ -353,7 +350,9 @@ class Statut(commands.Cog):
             return
 
         # Si un statut manuel est choisi
-        self._manual_status_override = True # Active le mode manuel
+        # Arrête la tâche de vérification automatique si elle est en cours
+        if self.check_bot_status.is_running():
+            self.check_bot_status.cancel()
         
         # Détermine le type de statut pour l'embed et le nom du canal
         target_status_type = status.value
