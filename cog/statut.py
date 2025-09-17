@@ -192,28 +192,29 @@ class Statut(commands.Cog):
     # --- Tâche de vérification principale ---
 
     @tasks.loop(seconds=5)
-    async def check_bot_status(self) -> list[str]:
+    async def check_bot_status(self, interaction: discord.Interaction | None = None) -> list[str]:
         """
         Tâche principale qui vérifie et corrige l'état du bot et des indicateurs visuels.
+        Fournit un retour progressif si un objet 'interaction' est passé.
         Retourne une liste de chaînes décrivant les actions entreprises.
         """
         async with self._update_lock:
             actions_taken = []
+            progress_log = []
+
+            if interaction:
+                progress_log.append("⚙️ Vérification en cours...")
+                await interaction.edit_original_response(content="\n".join(progress_log))
+
             await self.bot.wait_until_ready()
 
-            # 1. Déterminer l'état réel du bot
-            target_bot_member = None
-            for guild in self.bot.guilds:
-                if member := guild.get_member(BOT_ID):
-                    target_bot_member = member
-                    break
+            target_bot_member = next((g.get_member(BOT_ID) for g in self.bot.guilds if g.get_member(BOT_ID)), None)
             if not target_bot_member:
                 log.warning(f"Bot cible (ID: {BOT_ID}) introuvable.")
                 return actions_taken
 
             current_status = Status.ONLINE if target_bot_member.status != discord.Status.offline else Status.OFFLINE
 
-            # 2. Récupérer les indicateurs visuels actuels
             channel = self.bot.get_channel(CHANNEL_ID)
             if not channel:
                 log.error(f"Canal de statut (ID: {CHANNEL_ID}) introuvable.")
@@ -228,33 +229,50 @@ class Statut(commands.Cog):
 
             name_status = self._get_status_from_channel_name(channel)
 
-            # 3. Comparer et agir
             status_has_changed = self._last_known_status is not None and current_status != self._last_known_status
             embed_is_inconsistent = embed_status != current_status
             name_is_inconsistent = name_status != current_status
 
             if not status_has_changed and not embed_is_inconsistent and not name_is_inconsistent:
+                if interaction: await interaction.edit_original_response(content="✅ Tout est déjà à jour.")
                 return actions_taken
 
             if embed_is_inconsistent:
                 log.info(f"Correction de l'embed (attendu: {current_status.name}, vu: {embed_status}).")
                 if await self._update_embed(message, current_status):
                     actions_taken.append("✅ Message de statut mis à jour.")
+                    if interaction:
+                        progress_log.append(actions_taken[-1])
+                        await interaction.edit_original_response(content="\n".join(progress_log))
 
             if name_is_inconsistent:
                 log.info(f"Correction du nom du salon (attendu: {current_status.name}, vu: {name_status}).")
-                if await self._update_channel_name(channel, current_status):
+                if await self._update_channel_name(channel, current_status, interaction, progress_log):
                     actions_taken.append("✅ Nom du salon mis à jour.")
+                    if interaction:
+                        progress_log.append(actions_taken[-1])
+                        await interaction.edit_original_response(content="\n".join(progress_log))
 
             if status_has_changed:
                 log.info(f"Changement de statut détecté: {self._last_known_status.name} -> {current_status.name}")
                 if logs_channel := self.bot.get_channel(LOGS_CHANNEL_ID):
                     if await self._send_log(logs_channel, current_status, manual=False):
                         actions_taken.append("📄 Message de log envoyé.")
+                        if interaction:
+                            progress_log.append(actions_taken[-1])
+                            await interaction.edit_original_response(content="\n".join(progress_log))
                 if await self._send_ping(channel, current_status):
                     actions_taken.append("🔔 Notification envoyée.")
+                    if interaction:
+                        progress_log.append(actions_taken[-1])
+                        await interaction.edit_original_response(content="\n".join(progress_log))
 
             self._last_known_status = current_status
+
+            if interaction:
+                progress_log.append("\n🎉 Vérification terminée.")
+                await interaction.edit_original_response(content="\n".join(progress_log))
+
             return actions_taken
 
     @check_bot_status.before_loop
@@ -299,15 +317,9 @@ class Statut(commands.Cog):
                 self.check_bot_status.start()
                 log.info("Tâche de vérification automatique redémarrée.")
 
-            await interaction.edit_original_response(content="⚙️ Mode automatique activé. Lancement d'une vérification...")
-
-            actions = await self.check_bot_status()
-
-            if actions:
-                summary = "**Rapport de la vérification :**\n" + "\n".join(actions)
-                await interaction.followup.send(summary, ephemeral=True)
-            else:
-                await interaction.followup.send("✅ Tout est déjà à jour. Aucune action n'a été nécessaire.", ephemeral=True)
+            # La fonction check_bot_status gère maintenant elle-même le retour progressif
+            # lorsqu'on lui passe l'objet interaction.
+            await self.check_bot_status(interaction=interaction)
             return
 
         # --- Passage en mode manuel ---
