@@ -41,10 +41,10 @@ class Statut(commands.Cog):
         self.bot = bot
         self._last_known_status: Status | None = None
         self._update_lock = asyncio.Lock()
-        self.check_bot_status.start()
+        self._automatic_check_task.start()
 
     def cog_unload(self):
-        self.check_bot_status.cancel()
+        self._automatic_check_task.cancel()
 
     # --- Fonctions d'analyse de statut ---
 
@@ -148,29 +148,24 @@ class Statut(commands.Cog):
         await self._update_status_logic()
 
     async def _update_status_logic(self, interaction: discord.Interaction | None = None, forced_status: Status | None = None):
-        """
-        Logique centrale de vérification et de mise à jour.
-        Peut être appelée par la tâche de fond (silencieuse) ou par une commande (interactive).
-        """
         async with self._update_lock:
             progress_log = []
             is_interactive = interaction is not None
 
             if is_interactive:
-                progress_log.append("⚙️ Vérification en cours...")
+                progress_log.append(f"⏳ **Mise à jour vers `{forced_status.value if forced_status else 'auto'}` en cours...**")
                 await interaction.edit_original_response(content="\n".join(progress_log))
 
             # 1. Déterminer le statut cible
-            if forced_status:
+            is_manual = forced_status is not None
+            if is_manual:
                 target_status = forced_status
-                is_manual = True
             else:
                 target_bot_member = next((g.get_member(BOT_ID) for g in self.bot.guilds if g.get_member(BOT_ID)), None)
                 if not target_bot_member:
                     log.warning(f"Bot cible (ID: {BOT_ID}) introuvable.")
                     return
                 target_status = Status.ONLINE if target_bot_member.status != discord.Status.offline else Status.OFFLINE
-                is_manual = False
 
             # 2. Récupérer les indicateurs visuels
             channel = self.bot.get_channel(CHANNEL_ID)
@@ -190,36 +185,46 @@ class Statut(commands.Cog):
             embed_is_inconsistent = embed_status != target_status
             name_is_inconsistent = name_status != target_status
 
-            if not status_has_changed and not embed_is_inconsistent and not name_is_inconsistent and not forced_status:
+            if not status_has_changed and not embed_is_inconsistent and not name_is_inconsistent and not is_manual:
                 if is_interactive: await interaction.edit_original_response(content="✅ Tout est déjà à jour.")
                 return
 
             # Actions de mise à jour
-            actions_performed = []
-            if embed_is_inconsistent or forced_status:
+            if embed_is_inconsistent or is_manual:
                 if await self._update_embed(message, target_status):
-                    actions_performed.append("✅ Message de statut mis à jour.")
+                    if is_interactive:
+                        progress_log.append("✅ Message de statut mis à jour.")
+                        await interaction.edit_original_response(content="\n".join(progress_log))
+                elif is_interactive:
+                    progress_log.append("❌ Échec de la mise à jour du message.")
+                    await interaction.edit_original_response(content="\n".join(progress_log))
 
-            if name_is_inconsistent or forced_status:
-                # La mise à jour interactive du message de rate limit est gérée dans _update_channel_name
+            if name_is_inconsistent or is_manual:
                 if await self._update_channel_name(channel, target_status, interaction, progress_log if is_interactive else None):
-                    actions_performed.append("✅ Nom du salon mis à jour.")
+                    if is_interactive:
+                        progress_log.append("✅ Nom du salon mis à jour.")
+                        await interaction.edit_original_response(content="\n".join(progress_log))
+                elif is_interactive:
+                    progress_log.append("❌ Échec de la mise à jour du nom du salon.")
+                    await interaction.edit_original_response(content="\n".join(progress_log))
 
-            # Actions de notification
-            if status_has_changed or (forced_status and forced_status != self._last_known_status):
+            # Actions de notification (uniquement si le statut change)
+            if status_has_changed or (is_manual and target_status != self._last_known_status):
                 if logs_channel := self.bot.get_channel(LOGS_CHANNEL_ID):
                     if await self._send_log(logs_channel, target_status, manual=is_manual):
-                        actions_performed.append("📄 Message de log envoyé.")
+                        if is_interactive:
+                            progress_log.append("📄 Message de log envoyé.")
+                            await interaction.edit_original_response(content="\n".join(progress_log))
                 if await self._send_ping(channel, target_status):
-                    actions_performed.append("🔔 Notification envoyée.")
+                    if is_interactive:
+                        progress_log.append("🔔 Notification envoyée.")
+                        await interaction.edit_original_response(content="\n".join(progress_log))
 
             self._last_known_status = target_status
 
             if is_interactive:
-                # Met à jour le message final avec toutes les actions réussies
-                final_progress = [progress_log[0]] + actions_performed
-                final_progress.append("\n🎉 Opération terminée.")
-                await interaction.edit_original_response(content="\n".join(final_progress))
+                progress_log.append("\n🎉 Opération terminée.")
+                await interaction.edit_original_response(content="\n".join(progress_log))
 
     @_automatic_check_task.before_loop
     async def before_check(self):
