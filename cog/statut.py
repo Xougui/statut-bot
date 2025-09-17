@@ -177,10 +177,8 @@ class Statut(commands.Cog):
     async def check_bot_status(self):
         """Vérifie périodiquement le statut du bot et met à jour si nécessaire."""
         async with self._update_lock:
-            if self._manual_status_override:
-                log.debug("Vérification auto. ignorée (mode manuel actif).")
-                return
-
+            # Le drapeau _manual_status_override n'est plus vérifié ici car la tâche est
+            # maintenant complètement annulée en mode manuel.
             await self.bot.wait_until_ready()
 
             target_bot_member = None
@@ -271,6 +269,10 @@ class Statut(commands.Cog):
 
         if mode.value == "automatique":
             self._manual_status_override = False
+            if not self.check_bot_status.is_running():
+                self.check_bot_status.start()
+                log.info("Tâche de vérification automatique redémarrée.")
+
             await interaction.followup.send("⚙️ Le statut du bot est de retour en mode **automatique**. Lancement d'une vérification...", ephemeral=True)
             log.info("Mode manuel désactivé. Forçage de la vérification auto.")
             await self.check_bot_status() # Force une vérification immédiate
@@ -278,6 +280,10 @@ class Statut(commands.Cog):
 
         # --- Passage en mode manuel ---
         self._manual_status_override = True
+        if self.check_bot_status.is_running():
+            self.check_bot_status.cancel()
+            log.info("Tâche de vérification automatique mise en pause (mode manuel activé).")
+
         target_status = Status(mode.value)
 
         # Ne rien faire si le statut demandé est déjà actif
