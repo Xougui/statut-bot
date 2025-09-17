@@ -31,8 +31,8 @@ SERVERS = {
     "Lyxios Manage": {"id": "063a03b1", "panel_key": "katabump_hosting"}
 }
 
-# L'ID du canal est maintenant importé depuis PARAM.py pour la centralisation
-CHANNEL_ID = PARAM.CHANNEL_ID
+# L'ID du canal où le panel est envoyé.
+CHANNEL_ID = 1373664847786545272
 MESSAGE_FILE = "message_panel.json" # Nom du fichier pour stocker l'ID du message
 
 # --- Classes d'Interface Utilisateur (Discord UI) ---
@@ -115,7 +115,7 @@ class ServerControlView(discord.ui.View):
     async def stop_button_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
         """
         Callback pour le bouton 'Arrêter'.
-        Gère le cas spécial pour "Lyxios Manage".
+        Gère le cas spécial pour "Lyxios Manage", qui est le bot lui-même.
         """
         await interaction.response.defer(ephemeral=True)
         server_name = self.cog.selected_server
@@ -128,10 +128,12 @@ class ServerControlView(discord.ui.View):
             return
 
         try:
+            # CAS SPÉCIAL: Le serveur à arrêter est le bot lui-même.
             if server_name == "Lyxios Manage":
-                # Mettre à jour l'embed en "Hors ligne" immédiatement
-                await interaction.followup.send(f"🛑 {server_name} va s'arrêter dans 3 secondes. L'embed sera mis à jour en 'Hors ligne'.", ephemeral=True)
-                # Simuler le statut hors ligne avant l'arrêt réel
+                # ÉTAPE 1: Mettre à jour l'embed pour afficher un statut "Hors ligne".
+                # C'est la dernière action que le bot peut faire de manière fiable avant de s'éteindre.
+                await interaction.followup.send(f"🛑 {server_name} (le bot) va s'arrêter dans 3 secondes. L'embed sera mis à jour en 'Hors ligne'.", ephemeral=True)
+
                 offline_embed = discord.Embed(
                     title="🔧 Système de Contrôle des Bots",
                     description=f"Le serveur **{server_name}** est en cours d'arrêt et sera bientôt hors ligne.",
@@ -139,33 +141,33 @@ class ServerControlView(discord.ui.View):
                 )
                 offline_embed.add_field(name="🔹 Bot sélectionné :", value=server_name, inline=False)
                 offline_embed.add_field(name="📡 Statut du serveur :", value="🔴 Hors ligne (Pré-arrêt)", inline=False)
-
-                # Ajouter le champ de mise à jour si le bot est encore en ligne pour le faire
                 now = discord.utils.utcnow()
                 next_ping_time = now + datetime.timedelta(seconds=30 - (now.second % 30))
                 next_update_timestamp = int(next_ping_time.timestamp())
                 offline_embed.add_field(name="S'actualise dans", value=f"<t:{next_update_timestamp}:R>", inline=False)
 
                 if self.cog.embed_message:
-                    await self.cog.embed_message.edit(embed=offline_embed, view=self.cog.view) # Utiliser self.cog.view
-                else:
-                    channel = self.cog.bot.get_channel(self.cog.channel_id)
-                    if channel:
-                        message = await channel.send(embed=offline_embed, view=self.cog.view)
-                        self.cog.embed_message = message
-                        self.cog.message_id = message.id
-                        self.cog._save_message_id(self.cog.message_id)
+                    await self.cog.embed_message.edit(embed=offline_embed, view=self.cog.view)
 
-                await asyncio.sleep(3) # Attendre 3 secondes
+                # ÉTAPE 2: Envoyer la commande d'arrêt au panneau Pterodactyl.
+                # Après cette étape, le bot s'arrêtera et ne pourra plus exécuter de code.
+                await asyncio.sleep(3)
                 api_client.client.servers.send_power_action(server_id, 'stop')
-                print(f"🛑 {server_name} arrêté après 3 secondes.")
+                print(f"🛑 Commande d'arrêt envoyée à {server_name}. Le bot va maintenant s'éteindre.")
+
+            # CAS GÉNÉRAL: Le serveur à arrêter est un autre bot/serveur.
             else:
+                # ÉTAPE 1: Envoyer la commande d'arrêt.
                 api_client.client.servers.send_power_action(server_id, 'stop')
-                await interaction.followup.send(f"🛑 {server_name} arrêté avec succès.", ephemeral=True)
-                # Met à jour l'embed uniquement pour les autres serveurs, car "Lyxios Manage" (le bot) sera éteint.
+                await interaction.followup.send(f"🛑 Commande d'arrêt envoyée à {server_name}.", ephemeral=True)
+
+                # ÉTAPE 2: Mettre à jour l'embed pour refléter le nouveau statut (ex: "stopping").
+                # C'est possible car le bot de contrôle lui-même reste en ligne.
                 await self.cog.update_embed()
+
         except Exception as e:
-            print(f"Erreur lors de l'arrêt de {server_name}: {e}")
+            print(f"Erreur lors de la tentative d'arrêt de {server_name}: {e}")
+            traceback.print_exc()
             await interaction.followup.send(f"❌ Échec de l'arrêt de {server_name}. Erreur: `{e}`", ephemeral=True)
 
 # --- Cog Principal du Bot ---
