@@ -40,7 +40,6 @@ class Statut(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self._last_known_status: Status | None = None
-        self._manual_status_override = False
         self._update_lock = asyncio.Lock()
         self.check_bot_status.start()
 
@@ -50,60 +49,33 @@ class Statut(commands.Cog):
     # --- Fonctions d'analyse de statut ---
 
     def _get_status_from_embed(self, embed: discord.Embed | None) -> Status | None:
-        """Analyse un embed pour en extraire le statut."""
-        if not embed or not embed.title:
-            return None
+        if not embed or not embed.title: return None
         title = embed.title.lower()
-        if "en ligne" in title:
-            return Status.ONLINE
-        if "hors ligne" in title:
-            return Status.OFFLINE
-        if "en maintenance" in title:
-            return Status.MAINTENANCE
+        if "en ligne" in title: return Status.ONLINE
+        if "hors ligne" in title: return Status.OFFLINE
+        if "en maintenance" in title: return Status.MAINTENANCE
         return None
 
     def _get_status_from_channel_name(self, channel: discord.TextChannel | None) -> Status | None:
-        """Analyse le nom d'un salon pour en extraire le statut."""
-        if not channel:
-            return None
+        if not channel: return None
         name = channel.name.lower()
-        if "online" in name or "🟢" in name:
-            return Status.ONLINE
-        if "offline" in name or "🔴" in name:
-            return Status.OFFLINE
-        if "maintenance" in name or "🔵" in name:
-            return Status.MAINTENANCE
+        if "online" in name or "🟢" in name: return Status.ONLINE
+        if "offline" in name or "🔴" in name: return Status.OFFLINE
+        if "maintenance" in name or "🔵" in name: return Status.MAINTENANCE
         return None
 
-    # --- Fonctions de mise à jour individuelles ---
+    # --- Fonctions de mise à jour de bas niveau ---
 
     async def _update_embed(self, message: discord.Message, status: Status) -> bool:
-        """Met à jour l'embed du message de statut."""
         maj = datetime.datetime.now(PARIS_TZ).strftime('%d/%m/%Y %H:%M:%S')
-
         embed_builders = {
-            Status.ONLINE: lambda: discord.Embed(
-                title=f"{ONLINE_EMOJI}・**Bot en ligne**",
-                description=f"Le bot **Lyxios** est **en ligne** et toutes ses commandes et modules sont opérationnels !\n> Check ça pour savoir si le bot est `offline` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi .",
-                color=COLOR_ONLINE
-            ),
-            Status.OFFLINE: lambda: discord.Embed(
-                title=f"{OFFLINE_EMOJI}・**Bot hors ligne**",
-                description=f"Le bot **Lyxios** est **hors ligne**.\n\n> Ne vous inquiétez pas, le bot reviendra en ligne !\n> Check ça pour savoir si le bot est `online` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi\n-# Merci de votre patience.",
-                color=COLOR_OFFLINE
-            ),
-            Status.MAINTENANCE: lambda: discord.Embed(
-                title=f"{MAINTENANCE_EMOJI}・**Bot en maintenance**",
-                description=f"Le bot **Lyxios** est actuellement en **maintenance**.\n\n> Il sera de retour dès que possible. Merci de votre compréhension.",
-                color=COLOR_MAINTENANCE
-            ),
+            Status.ONLINE: lambda: discord.Embed(title=f"{ONLINE_EMOJI}・**Bot en ligne**", description=f"Le bot **Lyxios** est **en ligne** et toutes ses commandes et modules sont opérationnels !\n> Check ça pour savoir si le bot est `offline` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi .", color=COLOR_ONLINE),
+            Status.OFFLINE: lambda: discord.Embed(title=f"{OFFLINE_EMOJI}・**Bot hors ligne**", description=f"Le bot **Lyxios** est **hors ligne**.\n\n> Ne vous inquiétez pas, le bot reviendra en ligne !\n> Check ça pour savoir si le bot est `online` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi\n-# Merci de votre patience.", color=COLOR_OFFLINE),
+            Status.MAINTENANCE: lambda: discord.Embed(title=f"{MAINTENANCE_EMOJI}・**Bot en maintenance**", description=f"Le bot **Lyxios** est actuellement en **maintenance**.\n\n> Il sera de retour dès que possible. Merci de votre compréhension.", color=COLOR_MAINTENANCE),
         }
-
         builder = embed_builders.get(status)
         if not builder: return False
-
         new_embed = builder().set_footer(text=f"Mis à jour le: {maj}")
-
         try:
             await message.edit(embed=new_embed)
             log.info(f"Embed de statut mis à jour à: {status.name}")
@@ -113,17 +85,9 @@ class Statut(commands.Cog):
             return False
 
     async def _update_channel_name(self, channel: discord.TextChannel, status: Status, interaction: discord.Interaction | None = None, progress_log: list | None = None) -> bool:
-        """Met à jour le nom du salon de statut avec gestion des rate limits et feedback optionnel."""
-        name_map = {
-            Status.ONLINE: "═🟢・online",
-            Status.OFFLINE: "═🔴・offline",
-            Status.MAINTENANCE: "═🔵・maintenance",
-        }
+        name_map = { Status.ONLINE: "═🟢・online", Status.OFFLINE: "═🔴・offline", Status.MAINTENANCE: "═🔵・maintenance" }
         new_name = name_map.get(status)
-
-        if not new_name or channel.name == new_name:
-            return True
-
+        if not new_name or channel.name == new_name: return True
         while True:
             try:
                 await channel.edit(name=new_name)
@@ -138,12 +102,9 @@ class Statut(commands.Cog):
                             progress_log.append(f"⏳ Nom du salon rate limited. Réessai dans {retry_after:.2f}s...")
                             await interaction.edit_original_response(content="\n".join(progress_log))
                         except discord.HTTPException: pass
-
                     await asyncio.sleep(retry_after)
-
                     if interaction and progress_log:
-                        try:
-                            progress_log.pop()
+                        try: progress_log.pop()
                         except IndexError: pass
                 elif e.status == 403:
                     log.error("Erreur 403 (Permissions) pour changer le nom du salon.")
@@ -156,15 +117,9 @@ class Statut(commands.Cog):
                 return False
 
     async def _send_log(self, logs_channel: discord.TextChannel, status: Status, manual: bool):
-        """Envoie un message de log pour le changement de statut."""
         emoji_map = { Status.ONLINE: ONLINE_EMOJI, Status.OFFLINE: OFFLINE_EMOJI, Status.MAINTENANCE: MAINTENANCE_EMOJI }
-        log_embed = discord.Embed(
-            title=f"{emoji_map.get(status)}・Bot {status.value}",
-            description=f"Le bot est maintenant **{status.value}**.",
-            color=COLOR_ONLINE if status == Status.ONLINE else COLOR_OFFLINE if status == Status.OFFLINE else COLOR_MAINTENANCE
-        )
-        if manual:
-            log_embed.description += " (défini manuellement)"
+        log_embed = discord.Embed(title=f"{emoji_map.get(status)}・Bot {status.value}", description=f"Le bot est maintenant **{status.value}**.", color=COLOR_ONLINE if status == Status.ONLINE else COLOR_OFFLINE if status == Status.OFFLINE else COLOR_MAINTENANCE)
+        if manual: log_embed.description += " (défini manuellement)"
         try:
             await logs_channel.send(embed=log_embed)
             log.info(f"Message de log envoyé pour le statut {status.name}.")
@@ -174,13 +129,9 @@ class Statut(commands.Cog):
             return False
 
     async def _send_ping(self, channel: discord.TextChannel, status: Status):
-        """Envoie une mention de rôle temporaire, sauf pour la maintenance."""
-        if status == Status.MAINTENANCE:
-            log.debug("Ping ignoré pour le statut de maintenance.")
-            return True
+        if status == Status.MAINTENANCE: return True
         try:
-            ping_content = f"<@&{PING_ROLE_ID}> Le bot vient de passer {status.value}."
-            ping_message = await channel.send(content=ping_content)
+            ping_message = await channel.send(content=f"<@&{PING_ROLE_ID}> Le bot vient de passer {status.value}.")
             await asyncio.sleep(2)
             await ping_message.delete()
             log.info(f"Ping du rôle <@&{PING_ROLE_ID}> envoyé et supprimé.")
@@ -189,110 +140,98 @@ class Statut(commands.Cog):
             log.error(f"Erreur HTTP lors de l'envoi/suppression du ping: {e}")
             return False
 
-    # --- Tâche de vérification principale ---
+    # --- Tâche de vérification et de mise à jour ---
 
     @tasks.loop(seconds=5)
-    async def check_bot_status(self, interaction: discord.Interaction | None = None) -> list[str]:
+    async def _automatic_check_task(self):
+        """Tâche de fond qui appelle la logique de mise à jour principale."""
+        await self._update_status_logic()
+
+    async def _update_status_logic(self, interaction: discord.Interaction | None = None, forced_status: Status | None = None):
         """
-        Tâche principale qui vérifie et corrige l'état du bot et des indicateurs visuels.
-        Fournit un retour progressif si un objet 'interaction' est passé.
-        Retourne une liste de chaînes décrivant les actions entreprises.
+        Logique centrale de vérification et de mise à jour.
+        Peut être appelée par la tâche de fond (silencieuse) ou par une commande (interactive).
         """
         async with self._update_lock:
-            actions_taken = []
             progress_log = []
+            is_interactive = interaction is not None
 
-            if interaction:
+            if is_interactive:
                 progress_log.append("⚙️ Vérification en cours...")
                 await interaction.edit_original_response(content="\n".join(progress_log))
 
-            await self.bot.wait_until_ready()
+            # 1. Déterminer le statut cible
+            if forced_status:
+                target_status = forced_status
+                is_manual = True
+            else:
+                target_bot_member = next((g.get_member(BOT_ID) for g in self.bot.guilds if g.get_member(BOT_ID)), None)
+                if not target_bot_member:
+                    log.warning(f"Bot cible (ID: {BOT_ID}) introuvable.")
+                    return
+                target_status = Status.ONLINE if target_bot_member.status != discord.Status.offline else Status.OFFLINE
+                is_manual = False
 
-            target_bot_member = next((g.get_member(BOT_ID) for g in self.bot.guilds if g.get_member(BOT_ID)), None)
-            if not target_bot_member:
-                log.warning(f"Bot cible (ID: {BOT_ID}) introuvable.")
-                return actions_taken
-
-            current_status = Status.ONLINE if target_bot_member.status != discord.Status.offline else Status.OFFLINE
-
+            # 2. Récupérer les indicateurs visuels
             channel = self.bot.get_channel(CHANNEL_ID)
-            if not channel:
-                log.error(f"Canal de statut (ID: {CHANNEL_ID}) introuvable.")
-                return actions_taken
-
+            if not channel: return
             try:
                 message = await channel.fetch_message(MESSAGE_ID)
                 embed_status = self._get_status_from_embed(message.embeds[0] if message.embeds else None)
             except (discord.NotFound, discord.Forbidden) as e:
                 log.error(f"Impossible de récupérer le message de statut (ID: {MESSAGE_ID}). Erreur: {e}")
-                return actions_taken
+                if is_interactive: await interaction.followup.send("❌ Message de statut introuvable.", ephemeral=True)
+                return
 
             name_status = self._get_status_from_channel_name(channel)
 
-            status_has_changed = self._last_known_status is not None and current_status != self._last_known_status
-            embed_is_inconsistent = embed_status != current_status
-            name_is_inconsistent = name_status != current_status
+            # 3. Comparer et agir
+            status_has_changed = self._last_known_status is not None and target_status != self._last_known_status
+            embed_is_inconsistent = embed_status != target_status
+            name_is_inconsistent = name_status != target_status
 
-            if not status_has_changed and not embed_is_inconsistent and not name_is_inconsistent:
-                if interaction: await interaction.edit_original_response(content="✅ Tout est déjà à jour.")
-                return actions_taken
+            if not status_has_changed and not embed_is_inconsistent and not name_is_inconsistent and not forced_status:
+                if is_interactive: await interaction.edit_original_response(content="✅ Tout est déjà à jour.")
+                return
 
-            if embed_is_inconsistent:
-                log.info(f"Correction de l'embed (attendu: {current_status.name}, vu: {embed_status}).")
-                if await self._update_embed(message, current_status):
-                    actions_taken.append("✅ Message de statut mis à jour.")
-                    if interaction:
-                        progress_log.append(actions_taken[-1])
-                        await interaction.edit_original_response(content="\n".join(progress_log))
+            # Actions de mise à jour
+            actions_performed = []
+            if embed_is_inconsistent or forced_status:
+                if await self._update_embed(message, target_status):
+                    actions_performed.append("✅ Message de statut mis à jour.")
 
-            if name_is_inconsistent:
-                log.info(f"Correction du nom du salon (attendu: {current_status.name}, vu: {name_status}).")
-                if await self._update_channel_name(channel, current_status, interaction, progress_log):
-                    actions_taken.append("✅ Nom du salon mis à jour.")
-                    if interaction:
-                        progress_log.append(actions_taken[-1])
-                        await interaction.edit_original_response(content="\n".join(progress_log))
+            if name_is_inconsistent or forced_status:
+                # La mise à jour interactive du message de rate limit est gérée dans _update_channel_name
+                if await self._update_channel_name(channel, target_status, interaction, progress_log if is_interactive else None):
+                    actions_performed.append("✅ Nom du salon mis à jour.")
 
-            if status_has_changed:
-                log.info(f"Changement de statut détecté: {self._last_known_status.name} -> {current_status.name}")
+            # Actions de notification
+            if status_has_changed or (forced_status and forced_status != self._last_known_status):
                 if logs_channel := self.bot.get_channel(LOGS_CHANNEL_ID):
-                    if await self._send_log(logs_channel, current_status, manual=False):
-                        actions_taken.append("📄 Message de log envoyé.")
-                        if interaction:
-                            progress_log.append(actions_taken[-1])
-                            await interaction.edit_original_response(content="\n".join(progress_log))
-                if await self._send_ping(channel, current_status):
-                    actions_taken.append("🔔 Notification envoyée.")
-                    if interaction:
-                        progress_log.append(actions_taken[-1])
-                        await interaction.edit_original_response(content="\n".join(progress_log))
+                    if await self._send_log(logs_channel, target_status, manual=is_manual):
+                        actions_performed.append("📄 Message de log envoyé.")
+                if await self._send_ping(channel, target_status):
+                    actions_performed.append("🔔 Notification envoyée.")
 
-            self._last_known_status = current_status
+            self._last_known_status = target_status
 
-            if interaction:
-                progress_log.append("\n🎉 Vérification terminée.")
-                await interaction.edit_original_response(content="\n".join(progress_log))
+            if is_interactive:
+                # Met à jour le message final avec toutes les actions réussies
+                final_progress = [progress_log[0]] + actions_performed
+                final_progress.append("\n🎉 Opération terminée.")
+                await interaction.edit_original_response(content="\n".join(final_progress))
 
-            return actions_taken
-
-    @check_bot_status.before_loop
+    @_automatic_check_task.before_loop
     async def before_check(self):
-        """Initialise l'état interne du bot en lisant le message de statut existant."""
         await self.bot.wait_until_ready()
         log.info("Initialisation du statut avant le démarrage de la boucle...")
-
         channel = self.bot.get_channel(CHANNEL_ID)
-        if not channel:
-            log.error(f"Canal de statut (ID: {CHANNEL_ID}) introuvable.")
-            return
-
+        if not channel: return
         try:
             message = await channel.fetch_message(MESSAGE_ID)
             self._last_known_status = self._get_status_from_embed(message.embeds[0] if message.embeds else None)
             if self._last_known_status:
                 log.info(f"Statut initialisé à partir du message existant : {self._last_known_status.name}")
-            else:
-                log.warning("Impossible d'initialiser le statut depuis l'embed existant.")
         except (discord.NotFound, discord.Forbidden):
             log.warning(f"Message de statut (ID: {MESSAGE_ID}) non trouvé/accessible pour l'initialisation.")
 
@@ -308,70 +247,24 @@ class Statut(commands.Cog):
     ])
     @commands.is_owner()
     async def set_status_slash(self, interaction: discord.Interaction, mode: app_commands.Choice[str]):
-        """Définit manuellement le statut ou revient en mode automatique."""
         await interaction.response.defer(ephemeral=True)
 
         if mode.value == "automatique":
-            self._manual_status_override = False
-            if not self.check_bot_status.is_running():
-                self.check_bot_status.start()
+            if not self._automatic_check_task.is_running():
+                self._automatic_check_task.start()
                 log.info("Tâche de vérification automatique redémarrée.")
+            await self._update_status_logic(interaction=interaction)
+        else:
+            if self._automatic_check_task.is_running():
+                self._automatic_check_task.cancel()
+                log.info("Tâche de vérification automatique mise en pause (mode manuel activé).")
 
-            # La fonction check_bot_status gère maintenant elle-même le retour progressif
-            # lorsqu'on lui passe l'objet interaction.
-            await self.check_bot_status(interaction=interaction)
-            return
+            target_status = Status(mode.value)
+            if target_status == self._last_known_status:
+                await interaction.edit_original_response(content=f"Le bot est déjà en mode `{target_status.value}`.")
+                return
 
-        # --- Passage en mode manuel ---
-        self._manual_status_override = True
-        if self.check_bot_status.is_running():
-            self.check_bot_status.cancel()
-            log.info("Tâche de vérification automatique mise en pause (mode manuel activé).")
-
-        target_status = Status(mode.value)
-        if target_status == self._last_known_status:
-            await interaction.followup.send(f"Le bot est déjà en mode `{target_status.value}`.", ephemeral=True)
-            return
-
-        channel = self.bot.get_channel(CHANNEL_ID)
-        if not channel:
-            await interaction.followup.send(f"❌ Erreur: Canal de statut (ID: {CHANNEL_ID}) introuvable.", ephemeral=True)
-            return
-        
-        try:
-            message = await channel.fetch_message(MESSAGE_ID)
-        except (discord.NotFound, discord.Forbidden):
-            await interaction.followup.send(f"❌ Erreur: Message de statut (ID: {MESSAGE_ID}) introuvable.", ephemeral=True)
-            return
-
-        progress = [f"⏳ **Passage en mode manuel : `{target_status.value}`...**"]
-        await interaction.edit_original_response(content="\n".join(progress))
-
-        if await self._update_embed(message, target_status):
-            progress.append("✅ Message de statut mis à jour.")
-        else: progress.append("❌ Échec de la mise à jour du message.")
-        await interaction.edit_original_response(content="\n".join(progress))
-
-        if await self._update_channel_name(channel, target_status, interaction=interaction, progress_log=progress):
-            progress.append("✅ Nom du salon mis à jour.")
-        else: progress.append("❌ Échec de la mise à jour du nom du salon.")
-        await interaction.edit_original_response(content="\n".join(progress))
-
-        if logs_channel := self.bot.get_channel(LOGS_CHANNEL_ID):
-            if await self._send_log(logs_channel, target_status, manual=True):
-                progress.append("✅ Message de log envoyé.")
-            else: progress.append("❌ Échec de l'envoi du log.")
-            await interaction.edit_original_response(content="\n".join(progress))
-
-        if await self._send_ping(channel, target_status):
-            progress.append("✅ Notification envoyée.")
-        else: progress.append("❌ Échec de l'envoi de la notification.")
-
-        progress.append(f"\n🎉 **Terminé !** Statut réglé sur `{target_status.value}`.")
-        await interaction.edit_original_response(content="\n".join(progress))
-
-        self._last_known_status = target_status
-        log.info(f"Statut manuel défini sur: {target_status.name}")
+            await self._update_status_logic(interaction=interaction, forced_status=target_status)
 
 async def setup(bot):
     await bot.add_cog(Statut(bot))
