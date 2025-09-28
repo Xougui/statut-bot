@@ -503,11 +503,23 @@ class ManagementCog(commands.Cog):
 
             if french_channel:
                 await french_channel.send(message_fr)
+                try:
+                    mention = await french_channel.send("<@&1350428823052746752>")
+                    await asyncio.sleep(1)
+                    await mention.delete()
+                except Exception as e:
+                    logging.error(f"Erreur lors du ghost ping dans le canal français: {e}")
             else:
                 logging.warning(f"Canal français introuvable (ID: {french_channel_id})")
 
             if english_channel:
                 await english_channel.send(message_en)
+                try:
+                    mention = await english_channel.send("<@&1350428823052746752>")
+                    await asyncio.sleep(1)
+                    await mention.delete()
+                except Exception as e:
+                    logging.error(f"Erreur lors du ghost ping dans le canal anglais: {e}")
             else:
                 logging.warning(f"Canal anglais introuvable (ID: {english_channel_id})")
 
