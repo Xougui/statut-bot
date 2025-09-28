@@ -192,7 +192,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
         super().__init__()
         self.attachments = attachments
         self.is_test_run = is_test_run
-        self.api_url_gemini = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_api_key}"
+        self.api_url_gemini = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={gemini_api_key}"
         try:
             with open('version.json', 'r') as f:
                 self.version_number.default = json.load(f).get('version', '1.0.0')
