@@ -329,6 +329,12 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
             if test_channel:
                 full_test_message = f"{french_message_content}\n\n---\n\n{english_message_content}"
                 await self._send_and_publish(test_channel, full_test_message, attachment_data, followup_message)
+                try:
+                    mention = await test_channel.send("<@&1350428823052746752>")
+                    await asyncio.sleep(1)
+                    await mention.delete()
+                except Exception as e:
+                    logging.error(f"Erreur lors du ghost ping en mode test: {e}")
             else:
                 logging.error(f"Canal de test introuvable (ID: {UPDATE_CHANNEL_ID_TEST})")
                 await followup_message.edit(content=f"❌ Erreur: Le canal de test est introuvable.")
@@ -339,11 +345,23 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
             
             if fr_channel:
                 await self._send_and_publish(fr_channel, french_message_content, attachment_data, followup_message)
+                try:
+                    mention = await fr_channel.send("<@&1350428823052746752>")
+                    await asyncio.sleep(1)
+                    await mention.delete()
+                except Exception as e:
+                    logging.error(f"Erreur lors du ghost ping dans le canal français: {e}")
             else:
                 logging.error(f"Canal français introuvable (ID: {UPDATE_CHANNEL_ID_FR})")
 
             if en_channel:
                 await self._send_and_publish(en_channel, english_message_content, attachment_data, followup_message)
+                try:
+                    mention = await en_channel.send("<@&1350428823052746752>")
+                    await asyncio.sleep(1)
+                    await mention.delete()
+                except Exception as e:
+                    logging.error(f"Erreur lors du ghost ping dans le canal anglais: {e}")
             else:
                 logging.error(f"Canal anglais introuvable (ID: {UPDATE_CHANNEL_ID_EN})")
 
@@ -355,6 +373,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
         user_update_msg = f"{TEST_EMOJI} <@1335228717403996160> received an update !\n\n" if is_english else f"{TEST_EMOJI} <@1335228717403996160> a reçu une mise à jour !\n\n"
         conclusion_text = "Stay tuned for future announcements and thank you for your continued support!" if is_english else "Restez connectés pour de futures annonces et merci pour votre soutien continu !"
         team_signature = "The Development Team." if is_english else "L'équipe de développement."
+        feedback_prompt = "Use /feedback to report any mistakes or bugs or go to <#1350399062418915418>." if is_english else "Utilisez /feedback pour signaler des erreurs ou des bugs ou allez dans <#1350399062418915418>."
 
         parts = [f"# {ANNONCE_EMOJI} {title} {ANNONCE_EMOJI}\n\n", greeting]
         if intro:
@@ -362,7 +381,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
         parts.extend([user_update_msg, f"{changes}\n\n"])
         if outro:
             parts.append(f"{outro}\n\n")
-        parts.append(f"🚀 {conclusion_text} **Utilisez /feedback pour signaler des erreurs ou des bugs ou allez dans <#1350399062418915418>.**\n{team_signature}")
+        parts.append(f"🚀 {conclusion_text} **{feedback_prompt}**\n{team_signature}")
         return "".join(parts)
 
     async def _send_and_publish(self, channel: discord.TextChannel, content: str, attachment_data: list, followup_message):
@@ -397,14 +416,6 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
                 await msg.add_reaction(verify_emoji)
             except Exception as e:
                 logging.error(f"Impossible d'ajouter la réaction: {e}")
-
-            # Ghost ping
-            try:
-                mention = await channel.send("<@&1350428823052746752>")
-                await asyncio.sleep(1)
-                await mention.delete()
-            except Exception as e:
-                logging.error(f"Erreur lors du ghost ping: {e}")
 
         except discord.Forbidden:
             logging.error(f"Permissions insuffisantes pour envoyer des messages dans le canal {channel.name}.")
@@ -502,7 +513,14 @@ class ManagementCog(commands.Cog):
             message_en = f"**⚙️ Patch Deployed!**\n\nA new patch has just been applied. The version is now **{new_version}**."
 
             if french_channel:
-                await french_channel.send(message_fr)
+                msg_fr = await french_channel.send(message_fr)
+                if french_channel.is_news():
+                    await msg_fr.publish()
+                try:
+                    verify_emoji = discord.PartialEmoji(name="verify", animated=True, id=1350435235015426130)
+                    await msg_fr.add_reaction(verify_emoji)
+                except Exception as e:
+                    logging.error(f"Impossible d'ajouter la réaction: {e}")
                 try:
                     mention = await french_channel.send("<@&1350428823052746752>")
                     await asyncio.sleep(1)
@@ -513,7 +531,14 @@ class ManagementCog(commands.Cog):
                 logging.warning(f"Canal français introuvable (ID: {french_channel_id})")
 
             if english_channel:
-                await english_channel.send(message_en)
+                msg_en = await english_channel.send(message_en)
+                if english_channel.is_news():
+                    await msg_en.publish()
+                try:
+                    verify_emoji = discord.PartialEmoji(name="verify", animated=True, id=1350435235015426130)
+                    await msg_en.add_reaction(verify_emoji)
+                except Exception as e:
+                    logging.error(f"Impossible d'ajouter la réaction: {e}")
                 try:
                     mention = await english_channel.send("<@&1350428823052746752>")
                     await asyncio.sleep(1)
