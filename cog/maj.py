@@ -280,8 +280,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
             with open('version.json', 'w') as f:
                 json.dump({'version': new_version}, f, indent=2)
             logging.info(f"Numéro de version mis à jour vers : {new_version}")
-        except Exception as e:
-            logging.error(f"Impossible de sauvegarder la nouvelle version : {e}")
+        except (IOError, OSError) as e:
             await followup_message.edit(content=f"⚠️ Avertissement : Impossible de sauvegarder le nouveau numéro de version `{new_version}`.")
             await asyncio.sleep(3)
 
@@ -504,8 +503,8 @@ class ManagementCog(commands.Cog):
 
             # --- 4. Envoyer les notifications ---
             french_channel_id = 1345064533173080166
-            english_channel_id = 1421773639761526824
-
+            french_channel_id = UPDATE_CHANNEL_ID_FR
+            english_channel_id = UPDATE_CHANNEL_ID_EN
             french_channel = self.bot.get_channel(french_channel_id)
             english_channel = self.bot.get_channel(english_channel_id)
 
@@ -552,8 +551,7 @@ class ManagementCog(commands.Cog):
 
         except FileNotFoundError:
             await interaction.followup.send("❌ Erreur : Le fichier `version.json` est introuvable. Veuillez d'abord utiliser `/update` pour le créer.", ephemeral=True)
-        except (json.JSONDecodeError, Exception) as e:
-            logging.error(f"Erreur dans la commande /patch-note : {e}", exc_info=True)
+        except (json.JSONDecodeError, KeyError) as e:
             await interaction.followup.send(f"❌ Une erreur inattendue est survenue : {e}", ephemeral=True)
 
 
