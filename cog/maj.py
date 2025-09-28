@@ -41,11 +41,18 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
     def __init__(self, attachments: list[discord.Attachment], target_channel_id: int):
         super().__init__()
         self.attachments = attachments
-        self.update_channel_id = target_channel_id # Utilise l'ID du canal passé en argument
-        self.gemini_api_key = gemini_api_key # Stocker la clé API pour utilisation dans les méthodes
-        # URL de l'API Gemini, stockée une fois pour être réutilisée
+        self.update_channel_id = target_channel_id
+        self.gemini_api_key = gemini_api_key
         self.api_url_gemini = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key={self.gemini_api_key}"
 
+        # Charger la version actuelle et la pré-remplir dans le champ de version
+        try:
+            with open('version.json', 'r') as f:
+                data = json.load(f)
+                current_version = data.get('version', '1.0.0')
+        except (FileNotFoundError, json.JSONDecodeError):
+            current_version = '1.0.0'  # Version par défaut si le fichier n'existe pas ou est corrompu
+        self.version_number.default = current_version
 
     # Champ de texte pour le nom de la mise à jour
     update_name = ui.TextInput(
@@ -55,24 +62,29 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
         required=True
     )
 
+    # Champ pour le numéro de version
+    version_number = ui.TextInput(
+        label='Numéro de version (ex: 1.0.1)',
+        placeholder='Sera sauvegardé pour /patch-note',
+        max_length=20,
+        required=True
+    )
+
     # Champ de texte pour un petit mot d'introduction facultatif
     intro_message = ui.TextInput(
         label='Message d\'introduction (facultatif)',
         placeholder='Ajoutez un petit mot au début de l\'annonce (ex: "Chers utilisateurs,").',
         max_length=500,
-        required=False, # Rendu facultatif
-        row=1 # Positionnement
+        required=False
     )
 
     # Champ de texte pour la description des changements
     changes = ui.TextInput(
         label='Qu\'est-ce qui a changé ? &:✅ / ~:❌ / £:⏳',
         style=discord.TextStyle.paragraph,
-        # Placeholder raccourci pour respecter la limite de 100 caractères de Discord
         placeholder='Décrivez les changements, nouvelles fonctionnalités, corrections de bugs (sauts de ligne supportés).',
         max_length=2000,
-        required=True,
-        row=2 # Positionnement
+        required=True
     )
 
     # Champ de texte pour un petit mot de conclusion facultatif
@@ -80,8 +92,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
         label='Message de conclusion (facultatif)',
         placeholder='Ajoutez un petit mot à la fin de l\'annonce (ex: "Merci de votre soutien !").',
         max_length=500,
-        required=False, # Rendu facultatif
-        row=3 # Positionnement
+        required=False
     )
 
     async def _translate_text(self, title_fr_original: str, changes_fr_original: str,
@@ -264,6 +275,18 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
         await interaction.response.send_message("🚀 Préparation de l'annonce de mise à jour...", ephemeral=True)
         # Récupérer le message de réponse pour pouvoir le modifier par la suite
         followup_message = await interaction.original_response()
+
+        # --- Sauvegarde de la version ---
+        new_version = self.version_number.value
+        try:
+            with open('version.json', 'w') as f:
+                json.dump({'version': new_version}, f, indent=2)
+            logging.info(f"Numéro de version mis à jour vers : {new_version}")
+        except Exception as e:
+            logging.error(f"Impossible de sauvegarder la nouvelle version : {e}")
+            # Informer l'utilisateur de l'échec de la sauvegarde sans bloquer le reste
+            await followup_message.edit(content=f"⚠️ Avertissement : Impossible de sauvegarder le nouveau numéro de version `{new_version}`. L'annonce sera envoyée quand même.")
+            await asyncio.sleep(3) # Laisser le temps à l'utilisateur de lire
 
         # Les valeurs originales du modal
         original_title_fr = self.update_name.value
@@ -501,6 +524,65 @@ class ManagementCog(commands.Cog):
         modal = UpdateModal(attachments=files_for_modal, target_channel_id=target_channel_id)
         # Appelez send_modal directement sur interaction.response
         await interaction.response.send_modal(modal)
+
+    @app_commands.command(name="patch-note", description="[🤖 Dev] Déploie un patch et incrémente la version.")
+    @is_owner()
+    async def patch_note_command(self, interaction: discord.Interaction):
+        """
+        Annonce un patch, incrémente la version et notifie les canaux appropriés.
+        """
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            # --- 1. Lire la version actuelle ---
+            with open('version.json', 'r') as f:
+                data = json.load(f)
+                current_version = data.get('version', '1.0.0')
+
+            # --- 2. Incrémenter la version ---
+            parts = current_version.split('.')
+            if len(parts) != 3 or not all(p.isdigit() for p in parts):
+                await interaction.followup.send(f"❌ Erreur : Le format de la version `{current_version}` est invalide. Il doit être de type `X.Y.Z`.", ephemeral=True)
+                return
+
+            patch_number = int(parts[2])
+            new_patch_number = patch_number + 1
+            new_version = f"{parts[0]}.{parts[1]}.{new_patch_number}"
+
+            # --- 3. Mettre à jour le fichier JSON ---
+            with open('version.json', 'w') as f:
+                json.dump({'version': new_version}, f, indent=2)
+
+            logging.info(f"Version incrémentée de {current_version} à {new_version}")
+
+            # --- 4. Envoyer les notifications ---
+            french_channel_id = 1345064533173080166
+            english_channel_id = 1421773639761526824
+
+            french_channel = self.bot.get_channel(french_channel_id)
+            english_channel = self.bot.get_channel(english_channel_id)
+
+            message_fr = f"**⚙️ Patch Déployé !**\n\nUn nouveau patch vient d'être appliqué. La version est maintenant la **{new_version}**."
+            message_en = f"**⚙️ Patch Deployed!**\n\nA new patch has just been applied. The version is now **{new_version}**."
+
+            if french_channel:
+                await french_channel.send(message_fr)
+            else:
+                logging.warning(f"Canal français introuvable (ID: {french_channel_id})")
+
+            if english_channel:
+                await english_channel.send(message_en)
+            else:
+                logging.warning(f"Canal anglais introuvable (ID: {english_channel_id})")
+
+            await interaction.followup.send(f"✅ Le patch **{new_version}** a été annoncé avec succès.", ephemeral=True)
+
+        except FileNotFoundError:
+            await interaction.followup.send("❌ Erreur : Le fichier `version.json` est introuvable. Veuillez d'abord utiliser `/update` pour le créer.", ephemeral=True)
+        except (json.JSONDecodeError, Exception) as e:
+            logging.error(f"Erreur dans la commande /patch-note : {e}", exc_info=True)
+            await interaction.followup.send(f"❌ Une erreur inattendue est survenue : {e}", ephemeral=True)
+
 
     @update_command.error
     async def update_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
