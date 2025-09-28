@@ -103,7 +103,16 @@ async def _call_gemini_api(prompt: str, schema: dict, api_url: str) -> Optional[
             result = response.json()
             if result.get("candidates") and result["candidates"][0].get("content") and result["candidates"][0]["content"].get("parts"):
                 json_str = result["candidates"][0]["content"]["parts"][0]["text"]
-                return json.loads(json_str)
+
+                # Extrait le JSON même s'il est enrobé dans du Markdown
+                try:
+                    json_start = json_str.index('{')
+                    json_end = json_str.rindex('}') + 1
+                    json_str = json_str[json_start:json_end]
+                    return json.loads(json_str)
+                except (ValueError, json.JSONDecodeError) as e:
+                    logging.error(f"Error parsing JSON from Gemini: {e}\nResponse received: {json_str}")
+                    return None
             else:
                 logging.warning("Structure de réponse de l'API Gemini inattendue.")
                 return None
