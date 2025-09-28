@@ -19,6 +19,13 @@ MESSAGE_ID = 1346867347255721984
 LOGS_CHANNEL_ID = 1350443541867790406
 # L'ID du rôle à mentionner dans les messages de statut envoyés dans CHANNEL_ID.
 ROLE_ID = 1350429004032770068
+
+# --- IDs DES CANAUX DE MISE À JOUR ---
+UPDATE_CHANNEL_ID_FR = 1345064533173080166  # Salon français
+UPDATE_CHANNEL_ID_EN = 1421773639761526824  # Salon anglais
+UPDATE_CHANNEL_ID_TEST = 1350138595515568169 # Salon de test
+UPDATE_ROLE_ID = 1350428823052746752 # Rôle à mentionner pour les mises à jour
+
 # pipreqs --force --encoding=utf8 .
 
 # --------------------------------------------------
