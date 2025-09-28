@@ -201,7 +201,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
         super().__init__()
         self.attachments = attachments
         self.is_test_run = is_test_run
-        self.api_url_gemini = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key={gemini_api_key}"
+        self.api_url_gemini = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={gemini_api_key}"
         try:
             with open('version.json', 'r') as f:
                 self.version_number.default = json.load(f).get('version', '1.0.0')
@@ -236,7 +236,7 @@ class UpdateModal(ui.Modal, title='Nouvelle Mise à Jour'):
         french_message = self._build_message(corrected_texts, is_english=False)
         english_message = self._build_message(translated_texts, is_english=True)
 
-        if not all(translated_texts.values()):
+        if not translated_texts.get('title') or not translated_texts.get('changes'):
             english_message = f"### {PARAM.crossmarck} Translation failed\n\n"
             await followup_message.edit(content="⚠️ La traduction a échoué. Le message anglais sera incomplet.")
             await asyncio.sleep(2)
