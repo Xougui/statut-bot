@@ -11,6 +11,7 @@ from dotenv import (
 )
 from pydactyl.api_client import PterodactylClient
 
+import requests
 import PARAM  # Importe les variables de configuration depuis le fichier PARAM.py
 
 # --- Configuration du Bot et de Pterodactyl ---
@@ -462,8 +463,19 @@ class BotControl(commands.Cog):
                 ram_usage = round(resources.get("memory_bytes", 0) / (1024 * 1024), 2)
                 disk_usage = round(resources.get("disk_bytes", 0) / (1024 * 1024), 2)
 
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 403:
+                    error_message = "Accès refusé. La clé API n'a pas les permissions nécessaires."
+                    status = "🔒 Accès refusé"
+                    embed_color = discord.Color.orange()
+                else:
+                    error_message = f"Erreur HTTP: {e}"
+                    status = "🔴 Erreur HTTP"
+                    embed_color = discord.Color.red()
+                print(f"❌ {error_message}")
             except Exception as e:
                 error_message = "Une erreur est survenue lors de la récupération des données du serveur."
+                status = "🔴 Erreur Interne"
                 print(f"❌ {error_message} - Erreur: {e}")
                 traceback.print_exc()  # Imprime la trace complète de l'erreur
                 embed_color = discord.Color.red()
