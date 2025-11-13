@@ -429,7 +429,7 @@ class BotControl(commands.Cog):
             embed_color = discord.Color.red()
         else:
             try:
-                server_info_raw = api_client.client.servers.get_server(server_id)
+                server_info_raw = api_client.client.servers.get_server(server_id=server_id)
                 server_stats_raw = api_client.client.servers.get_server_utilization(
                     server_id
                 )
