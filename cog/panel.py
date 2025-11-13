@@ -10,14 +10,14 @@ from dotenv import (
     load_dotenv,  # Pour charger les variables d'environnement depuis un fichier .env
 )
 from pydactyl.api_client import PterodactylClient
-
 import requests
+
 import PARAM  # Importe les variables de configuration depuis le fichier PARAM.py
 
 # --- Configuration du Bot et de Pterodactyl ---
 load_dotenv()  # Charge les variables du fichier .env
 apikey1 = os.getenv("API_XOUXOU")
-apikey2 = os.getenv("API_KATABUMP")
+apikey2 = os.getenv("API_KATA")
 
 PTERODACTYL_CONFIGS = {
     "xouxou_hosting": {"url": "https://panel.xouxou-hosting.fr", "api_key": apikey1},
@@ -430,7 +430,9 @@ class BotControl(commands.Cog):
             embed_color = discord.Color.red()
         else:
             try:
-                server_info_raw = api_client.client.servers.get_server(server_id=server_id)
+                server_info_raw = api_client.client.servers.get_server(
+                    server_id=server_id
+                )
                 server_stats_raw = api_client.client.servers.get_server_utilization(
                     server_id
                 )
@@ -465,7 +467,9 @@ class BotControl(commands.Cog):
 
             except requests.exceptions.HTTPError as e:
                 if e.response.status_code == 403:
-                    error_message = "Accès refusé. La clé API n'a pas les permissions nécessaires."
+                    error_message = (
+                        "Accès refusé. La clé API n'a pas les permissions nécessaires."
+                    )
                     status = "🔒 Accès refusé"
                     embed_color = discord.Color.orange()
                 else:
