@@ -476,7 +476,6 @@ class BotControl(commands.Cog):
                     error_message = f"Erreur HTTP: {e}"
                     status = "🔴 Erreur HTTP"
                     embed_color = discord.Color.red()
-                print(f"❌ {error_message}")
             except Exception as e:
                 error_message = "Une erreur est survenue lors de la récupération des données du serveur."
                 status = "🔴 Erreur Interne"
