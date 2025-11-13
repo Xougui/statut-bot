@@ -16,7 +16,7 @@ import PARAM  # Importe les variables de configuration depuis le fichier PARAM.p
 # --- Configuration du Bot et de Pterodactyl ---
 load_dotenv()  # Charge les variables du fichier .env
 apikey1 = os.getenv("API_XOUXOU")
-apikey2 = os.getenv("API_KATABUMP")
+apikey2 = os.getenv("API_KATA")
 
 PTERODACTYL_CONFIGS = {
     "xouxou_hosting": {"url": "https://panel.xouxou-hosting.fr", "api_key": apikey1},
