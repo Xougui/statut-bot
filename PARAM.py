@@ -4,7 +4,7 @@ owners = [946098490654740580, 1178647820052467823]
 
 # --- COULEUR DES EMBEDS ---
 # Couleur par défaut pour les messages intégrés (embeds). Utilisez un format hexadécimal.
-couleur = 0x42694b
+couleur = 0x42694B
 
 # --- ID DU BOT À SURVEILLER ---
 # L'ID de l'utilisateur du bot dont vous voulez suivre le statut.
@@ -23,10 +23,16 @@ ROLE_ID = 1350429004032770068
 # --- IDs DES CANAUX DE MISE À JOUR ---
 UPDATE_CHANNEL_ID_FR = 1345064533173080166  # Salon français
 UPDATE_CHANNEL_ID_EN = 1421773639761526824  # Salon anglais
-UPDATE_CHANNEL_ID_TEST = 1350138595515568169 # Salon de test
-UPDATE_ROLE_ID = 1350428823052746752 # Rôle à mentionner pour les mises à jour
+UPDATE_CHANNEL_ID_TEST = 1350138595515568169  # Salon de test
+UPDATE_ROLE_ID = 1350428823052746752  # Rôle à mentionner pour les mises à jour
 
-# pipreqs --force --encoding=utf8 .
+# pipreqs --force --encoding=utf8
+# pip list --outdated | Select-String -Pattern '^\S+' | ForEach-Object { pip install --upgrade $_.Matches.Value }
+# pip-review --auto
+
+# ruff check . --fix
+# ruff check . --fix --unsafe-fixes
+# ruff format .
 
 # --------------------------------------------------
 # EMOJIS DISCORD
