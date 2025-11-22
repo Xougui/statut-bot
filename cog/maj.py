@@ -177,9 +177,12 @@ async def _call_gemini_api(prompt: str, schema: dict, api_url: str) -> dict | No
 async def _correct_french_text(text_parts: dict, api_url: str) -> dict:
     """Corrige le texte français en utilisant l'API Gemini."""
     prompt = (
-        "Corrigez les fautes d'orthographe et de grammaire dans le texte français suivant. "
-        "Répondez uniquement avec un objet JSON. L'objet JSON doit avoir quatre clés: 'corrected_title', 'corrected_changes', 'corrected_intro', et 'corrected_outro'. "
-        "Préservez tous les sauts de ligne originaux (\n) et les caractères spéciaux comme &; ~; £.\n\n"
+        "Agis comme un correcteur orthographique et grammatical expert. Corrige le texte français suivant. "
+        "Règles strictes :\n"
+        "1. Réponds uniquement avec un objet JSON valide contenant les clés : 'corrected_title', 'corrected_changes', 'corrected_intro', et 'corrected_outro'.\n"
+        "2. PRÉSERVE scrupuleusement la mise en forme, TOUS les sauts de ligne (\n), et les caractères spéciaux (&, ~, £).\n"
+        "3. NE CHANGE PAS les mots techniques, les noms propres, ou les termes que tu ne connais pas. Si tu as un doute, garde le mot original.\n"
+        "4. Ne change pas le sens des phrases.\n\n"
         f"Titre: {text_parts['title']}\n"
         f"Changements: {text_parts['changes']}\n"
         f"Introduction: {text_parts['intro']}\n"
@@ -218,9 +221,12 @@ async def _correct_french_text(text_parts: dict, api_url: str) -> dict:
 async def _translate_to_english(text_parts: dict, api_url: str) -> dict:
     """Traduit le texte en anglais en utilisant l'API Gemini."""
     prompt = (
-        "Traduisez le texte suivant du français à l'anglais. Répondez uniquement avec un objet JSON. "
-        "L'objet JSON doit avoir quatre clés: 'title', 'changes', 'intro', et 'outro'. "
-        "Préservez les sauts de ligne (\n). Ne traduisez pas les mots entre `...` ni les emojis Discord (<:...:...>).\n\n"
+        "Agis comme un traducteur expert du français vers l'anglais. Traduis le texte suivant.\n"
+        "Règles strictes :\n"
+        "1. Réponds uniquement avec un objet JSON valide contenant les clés : 'title', 'changes', 'intro', 'outro'.\n"
+        "2. PRÉSERVE scrupuleusement la mise en forme et TOUS les sauts de ligne (\n).\n"
+        "3. NE TRADUIS PAS les mots entre `code`, les variables, ou les emojis Discord (<:...:...>).\n"
+        "4. Conserve les termes techniques inchangés si une traduction directe n'est pas évidente.\n\n"
         f"Titre original: {text_parts['title']}\n"
         f"Changements originaux: {text_parts['changes']}\n"
         f"Introduction originale: {text_parts['intro']}\n"
@@ -249,15 +255,201 @@ async def _translate_to_english(text_parts: dict, api_url: str) -> dict:
     return {"title": "", "changes": "", "intro": "", "outro": ""}
 
 
+def _build_message(texts: dict, is_english: bool) -> str:
+    """Construit le contenu du message de mise à jour."""
+    title, intro, changes, outro = (
+        texts["title"],
+        texts["intro"],
+        texts["changes"],
+        texts["outro"],
+    )
+
+    if is_english:
+        changes = (
+            changes.replace("&", PARAM.checkmark)
+            .replace("~", PARAM.crossmarck)
+            .replace("£", PARAM.in_progress)
+        )
+        greeting = "👋 Hello to the entire community!\n\n"
+        user_update_msg = f"{PARAM.test} <@{PARAM.BOT_ID}> received an update !\n\n"
+        conclusion_text = "Stay tuned for future announcements and thank you for your continued support!"
+        team_signature = "The Development Team."
+        feedback_prompt = "Use /feedback to report any mistakes or bugs or go to <#1350399062418915418>."
+    else:
+        changes = (
+            changes.replace("&", f"{PARAM.checkmark}:")
+            .replace("~", f"{PARAM.crossmarck}:")
+            .replace("£", f"{PARAM.in_progress}:")
+        )
+        greeting = "👋 Coucou à toute la communauté !\n\n"
+        user_update_msg = f"{PARAM.test} <@{PARAM.BOT_ID}> a reçu une mise à jour !\n\n"
+        conclusion_text = "Restez connectés pour de futures annonces et merci pour votre soutien continu !"
+        team_signature = "L'équipe de développement."
+        feedback_prompt = "Utilisez /feedback pour signaler des erreurs ou des bugs ou allez dans <#1350399062418915418>."
+
+    parts = [f"# {PARAM.annonce} {title} {PARAM.annonce}\n\n", greeting]
+    if intro:
+        parts.append(f"{intro}\n\n")
+    parts.extend([user_update_msg, f"{changes}\n\n"])
+    if outro:
+        parts.append(f"{outro}\n\n")
+    parts.append(f"🚀 {conclusion_text} **{feedback_prompt}**\n{team_signature}")
+    return "".join(parts)
+
+
+class EditUpdateModal(ui.Modal):
+    """Modal pour éditer le texte de la mise à jour (FR ou EN)."""
+
+    def __init__(self, texts: dict, is_english: bool, view: "UpdateManagerView") -> None:
+        title = "Éditer texte (Anglais)" if is_english else "Éditer texte (Français)"
+        super().__init__(title=title)
+        self.texts = texts
+        self.is_english = is_english
+        self.view_ref = view
+
+        self.title_input = ui.TextInput(
+            label="Titre", default=texts.get("title", ""), required=True
+        )
+        self.intro_input = ui.TextInput(
+            label="Introduction",
+            default=texts.get("intro", ""),
+            style=discord.TextStyle.paragraph,
+            required=False,
+        )
+        self.changes_input = ui.TextInput(
+            label="Changements",
+            default=texts.get("changes", ""),
+            style=discord.TextStyle.paragraph,
+            required=True,
+        )
+        self.outro_input = ui.TextInput(
+            label="Conclusion",
+            default=texts.get("outro", ""),
+            style=discord.TextStyle.paragraph,
+            required=False,
+        )
+
+        self.add_item(self.title_input)
+        self.add_item(self.intro_input)
+        self.add_item(self.changes_input)
+        self.add_item(self.outro_input)
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        new_texts = {
+            "title": self.title_input.value,
+            "intro": self.intro_input.value,
+            "changes": self.changes_input.value,
+            "outro": self.outro_input.value,
+        }
+
+        if self.is_english:
+            self.view_ref.en_texts = new_texts
+        else:
+            self.view_ref.fr_texts = new_texts
+
+        await self.view_ref.refresh_message(interaction)
+
+
+class UpdateManagerView(ui.View):
+    """Vue pour gérer l'envoi de la mise à jour (Modifier / Envoyer Production)."""
+
+    def __init__(
+        self,
+        fr_texts: dict,
+        en_texts: dict,
+        files_data: list[tuple[str, bytes]],
+        original_interaction: discord.Interaction,
+    ) -> None:
+        super().__init__(timeout=None)
+        self.fr_texts = fr_texts
+        self.en_texts = en_texts
+        self.files_data = files_data  # List of (filename, bytes)
+        self.original_interaction = original_interaction
+
+    async def refresh_message(self, interaction: discord.Interaction) -> None:
+        """Met à jour le message de test avec les nouvelles données."""
+        french_message = _build_message(self.fr_texts, is_english=False)
+        english_message = _build_message(self.en_texts, is_english=True)
+        full_test_message = f"{french_message}\n\n---\n\n{english_message}"
+
+        # Re-create files from bytes
+        files = []
+        for filename, file_bytes in self.files_data:
+            files.append(discord.File(io.BytesIO(file_bytes), filename=filename))
+
+        # If we are replying to the interaction (Modal submit), we use response.edit_message
+        if not interaction.response.is_done():
+            await interaction.response.edit_message(
+                content=full_test_message, attachments=files, view=self
+            )
+        else:
+            # Fallback
+            await interaction.edit_original_response(
+                content=full_test_message, attachments=files, view=self
+            )
+
+    @ui.button(label="Envoyer Production", style=discord.ButtonStyle.green)
+    async def send_prod(self, interaction: discord.Interaction, button: ui.Button) -> None:
+        await interaction.response.defer()
+
+        # Disable buttons to prevent double click
+        for child in self.children:
+            child.disabled = True
+        await interaction.edit_original_response(view=self)
+
+        fr_channel = interaction.guild.get_channel(PARAM.UPDATE_CHANNEL_ID_FR)
+        en_channel = interaction.guild.get_channel(PARAM.UPDATE_CHANNEL_ID_EN)
+
+        french_message = _build_message(self.fr_texts, is_english=False)
+        english_message = _build_message(self.en_texts, is_english=True)
+
+        # Re-create files for FR
+        files_fr = []
+        for filename, file_bytes in self.files_data:
+            files_fr.append(discord.File(io.BytesIO(file_bytes), filename=filename))
+
+        await _send_and_publish(fr_channel, french_message, files_fr)
+        await _ghost_ping(fr_channel)
+
+        # Re-create files for EN (or send without files as before?)
+        # The original code said: # On ne re-upload pas les fichiers pour le 2ème message
+        # So we send EN without files.
+        await _send_and_publish(en_channel, english_message, None)
+        await _ghost_ping(en_channel)
+
+        await interaction.followup.send(
+            "✅ Mise à jour déployée en production !", ephemeral=True
+        )
+
+    @ui.button(label="Éditer FR", style=discord.ButtonStyle.blurple)
+    async def edit_fr(self, interaction: discord.Interaction, button: ui.Button) -> None:
+        await interaction.response.send_modal(
+            EditUpdateModal(self.fr_texts, is_english=False, view=self)
+        )
+
+    @ui.button(label="Éditer EN", style=discord.ButtonStyle.blurple)
+    async def edit_en(self, interaction: discord.Interaction, button: ui.Button) -> None:
+        await interaction.response.send_modal(
+            EditUpdateModal(self.en_texts, is_english=True, view=self)
+        )
+
+    @ui.button(label="Annuler", style=discord.ButtonStyle.red)
+    async def cancel(self, interaction: discord.Interaction, button: ui.Button) -> None:
+        await interaction.response.send_message(
+            "❌ Mise à jour annulée.", ephemeral=True
+        )
+        # Disable buttons
+        for child in self.children:
+            child.disabled = True
+        await interaction.message.edit(view=self)
+
+
 class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
     """Modal Discord pour collecter les informations d'une nouvelle mise à jour."""
 
-    def __init__(
-        self, attachments: list[discord.Attachment], is_test_run: bool
-    ) -> None:
+    def __init__(self, attachments: list[discord.Attachment]) -> None:
         super().__init__()
         self.attachments = attachments
-        self.is_test_run = is_test_run
         self.api_url_gemini = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key={gemini_api_key}"
         try:
             with open("version.json") as f:
@@ -309,41 +501,50 @@ class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
             corrected_texts, self.api_url_gemini
         )
 
-        french_message = self._build_message(corrected_texts, is_english=False)
-        english_message = self._build_message(translated_texts, is_english=True)
-
         if not translated_texts.get("title") or not translated_texts.get("changes"):
-            english_message = f"### {PARAM.crossmarck} Translation failed\n\n"
             await followup_message.edit(
                 content="⚠️ La traduction a échoué. Le message anglais sera incomplet."
             )
             await asyncio.sleep(2)
 
-        attachment_files = await self._prepare_attachments(followup_message)
+        # Read files into memory (bytes) to persist them
+        files_data = []
+        for attachment in self.attachments:
+            try:
+                data = await attachment.read()
+                files_data.append((attachment.filename, data))
+            except Exception as e:
+                logging.error(f"Error reading attachment {attachment.filename}: {e}")
 
-        await followup_message.edit(content="📤 Envoi de l'annonce sur Discord...")
-
-        if self.is_test_run:
-            test_channel = interaction.guild.get_channel(PARAM.UPDATE_CHANNEL_ID_TEST)
-            full_test_message = f"{french_message}\n\n---\n\n{english_message}"
-            await _send_and_publish(
-                test_channel, full_test_message, attachment_files, followup_message
+        # Prepare files for the test message
+        files_objects = []
+        for filename, file_bytes in files_data:
+            files_objects.append(
+                discord.File(io.BytesIO(file_bytes), filename=filename)
             )
-            await _ghost_ping(test_channel)
-        else:
-            fr_channel = interaction.guild.get_channel(PARAM.UPDATE_CHANNEL_ID_FR)
-            en_channel = interaction.guild.get_channel(PARAM.UPDATE_CHANNEL_ID_EN)
 
-            await _send_and_publish(
-                fr_channel, french_message, attachment_files, followup_message
-            )
-            await _ghost_ping(fr_channel)
+        french_message = _build_message(corrected_texts, is_english=False)
+        english_message = _build_message(translated_texts, is_english=True)
+        full_test_message = f"{french_message}\n\n---\n\n{english_message}"
 
-            # On ne re-upload pas les fichiers pour le 2ème message
-            await _send_and_publish(en_channel, english_message, None, followup_message)
-            await _ghost_ping(en_channel)
+        await followup_message.edit(
+            content="📤 Envoi de la prévisualisation sur le canal test..."
+        )
 
-        await followup_message.edit(content="🎉 Annonce envoyée avec succès !")
+        test_channel = interaction.guild.get_channel(PARAM.UPDATE_CHANNEL_ID_TEST)
+
+        view = UpdateManagerView(
+            corrected_texts, translated_texts, files_data, interaction
+        )
+
+        await test_channel.send(
+            content=full_test_message, files=files_objects, view=view
+        )
+        await _ghost_ping(test_channel)
+
+        await followup_message.edit(
+            content="🎉 Prévisualisation envoyée ! Vérifiez le canal test."
+        )
 
     def _save_version(self):
         try:
@@ -352,71 +553,6 @@ class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
             logging.info(f"Version mise à jour vers : {self.version_number.value}")
         except OSError as e:
             logging.error(f"Impossible de sauvegarder la version : {e}")
-
-    def _build_message(self, texts: dict, is_english: bool) -> str:
-        """Construit le contenu du message de mise à jour."""
-        title, intro, changes, outro = (
-            texts["title"],
-            texts["intro"],
-            texts["changes"],
-            texts["outro"],
-        )
-
-        if is_english:
-            changes = (
-                changes.replace("&", PARAM.checkmark)
-                .replace("~", PARAM.crossmarck)
-                .replace("£", PARAM.in_progress)
-            )
-            greeting = "👋 Hello to the entire community!\n\n"
-            user_update_msg = f"{PARAM.test} <@{PARAM.BOT_ID}> received an update !\n\n"
-            conclusion_text = "Stay tuned for future announcements and thank you for your continued support!"
-            team_signature = "The Development Team."
-            feedback_prompt = "Use /feedback to report any mistakes or bugs or go to <#1350399062418915418>."
-        else:
-            changes = (
-                changes.replace("&", f"{PARAM.checkmark}:")
-                .replace("~", f"{PARAM.crossmarck}:")
-                .replace("£", f"{PARAM.in_progress}:")
-            )
-            greeting = "👋 Coucou à toute la communauté !\n\n"
-            user_update_msg = (
-                f"{PARAM.test} <@{PARAM.BOT_ID}> a reçu une mise à jour !\n\n"
-            )
-            conclusion_text = "Restez connectés pour de futures annonces et merci pour votre soutien continu !"
-            team_signature = "L'équipe de développement."
-            feedback_prompt = "Utilisez /feedback pour signaler des erreurs ou des bugs ou allez dans <#1350399062418915418>."
-
-        parts = [f"# {PARAM.annonce} {title} {PARAM.annonce}\n\n", greeting]
-        if intro:  # E701: Multiple statements on one line (colon)
-            parts.append(f"{intro}\n\n")
-        parts.extend([user_update_msg, f"{changes}\n\n"])
-        if outro:  # E701: Multiple statements on one line (colon)
-            parts.append(f"{outro}\n\n")
-        parts.append(f"🚀 {conclusion_text} **{feedback_prompt}**\n{team_signature}")
-        return "".join(parts)
-
-    async def _prepare_attachments(
-        self, followup_message: discord.WebhookMessage
-    ) -> list[discord.File]:
-        """Prépare les pièces jointes pour l'envoi."""
-        files = []
-        for attachment in self.attachments:
-            try:
-                files.append(
-                    discord.File(
-                        io.BytesIO(await attachment.read()),
-                        filename=attachment.filename,
-                    )
-                )
-            except Exception as e:
-                logging.error(
-                    f"Impossible de lire la pièce jointe {attachment.filename}: {e}"
-                )
-                await followup_message.edit(
-                    content=f"⚠️ Impossible d'attacher le fichier `{attachment.filename}`."
-                )
-        return files
 
 
 class ManagementCog(commands.Cog):
@@ -428,26 +564,15 @@ class ManagementCog(commands.Cog):
     @app_commands.command(
         name="update", description="[🤖 Dev] Envoie une annonce de mise à jour."
     )
-    @app_commands.describe(
-        attachments="Fichier à joindre.", test="Envoyer sur le canal de test ?"
-    )
-    @app_commands.choices(
-        test=[
-            app_commands.Choice(name="Oui", value="oui"),
-            app_commands.Choice(name="Non", value="non"),
-        ]
-    )
+    @app_commands.describe(attachments="Fichier à joindre.")
     @is_owner()
     async def update_command(
         self,
         interaction: discord.Interaction,
-        test: str,
         attachments: discord.Attachment | None = None,
     ) -> None:
         files = [attachments] if attachments else []
-        await interaction.response.send_modal(
-            UpdateModal(attachments=files, is_test_run=(test == "oui"))
-        )
+        await interaction.response.send_modal(UpdateModal(attachments=files))
 
     @app_commands.command(
         name="patch-note",
