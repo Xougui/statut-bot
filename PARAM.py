@@ -26,6 +26,10 @@ UPDATE_CHANNEL_ID_EN = 1421773639761526824  # Salon anglais
 UPDATE_CHANNEL_ID_TEST = 1350138595515568169  # Salon de test
 UPDATE_ROLE_ID = 1350428823052746752  # Rôle à mentionner pour les mises à jour
 
+# --- MODÈLE GEMINI ---
+# Nom du modèle Gemini à utiliser pour la correction et la traduction.
+GEMINI_MODEL = "gemini-2.5-pro"
+
 # pipreqs --force --encoding=utf8
 # pip list --outdated | Select-String -Pattern '^\S+' | ForEach-Object { pip install --upgrade $_.Matches.Value }
 # pip-review --auto
