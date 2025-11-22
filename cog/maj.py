@@ -300,7 +300,9 @@ def _build_message(texts: dict, is_english: bool) -> str:
 class EditUpdateModal(ui.Modal):
     """Modal pour éditer le texte de la mise à jour (FR ou EN)."""
 
-    def __init__(self, texts: dict, is_english: bool, view: "UpdateManagerView") -> None:
+    def __init__(
+        self, texts: dict, is_english: bool, view: "UpdateManagerView"
+    ) -> None:
         title = "Éditer texte (Anglais)" if is_english else "Éditer texte (Français)"
         super().__init__(title=title)
         self.texts = texts
@@ -389,7 +391,9 @@ class UpdateManagerView(ui.View):
             )
 
     @ui.button(label="Envoyer Production", style=discord.ButtonStyle.green)
-    async def send_prod(self, interaction: discord.Interaction, button: ui.Button) -> None:
+    async def send_prod(
+        self, interaction: discord.Interaction, button: ui.Button
+    ) -> None:
         await interaction.response.defer()
 
         # Disable buttons to prevent double click
@@ -422,13 +426,17 @@ class UpdateManagerView(ui.View):
         )
 
     @ui.button(label="Éditer FR", style=discord.ButtonStyle.blurple)
-    async def edit_fr(self, interaction: discord.Interaction, button: ui.Button) -> None:
+    async def edit_fr(
+        self, interaction: discord.Interaction, button: ui.Button
+    ) -> None:
         await interaction.response.send_modal(
             EditUpdateModal(self.fr_texts, is_english=False, view=self)
         )
 
     @ui.button(label="Éditer EN", style=discord.ButtonStyle.blurple)
-    async def edit_en(self, interaction: discord.Interaction, button: ui.Button) -> None:
+    async def edit_en(
+        self, interaction: discord.Interaction, button: ui.Button
+    ) -> None:
         await interaction.response.send_modal(
             EditUpdateModal(self.en_texts, is_english=True, view=self)
         )
@@ -450,7 +458,7 @@ class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
     def __init__(self, attachments: list[discord.Attachment]) -> None:
         super().__init__()
         self.attachments = attachments
-        self.api_url_gemini = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key={gemini_api_key}"
+        self.api_url_gemini = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={gemini_api_key}"
         try:
             with open("version.json") as f:
                 self.version_number.default = json.load(f).get("version", "1.0.0")
