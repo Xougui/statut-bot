@@ -415,10 +415,12 @@ class UpdateManagerView(ui.View):
         await _send_and_publish(fr_channel, french_message, files_fr)
         await _ghost_ping(fr_channel)
 
-        # Re-create files for EN (or send without files as before?)
-        # The original code said: # On ne re-upload pas les fichiers pour le 2ème message
-        # So we send EN without files.
-        await _send_and_publish(en_channel, english_message, None)
+        # Re-create files for EN
+        files_en = []
+        for filename, file_bytes in self.files_data:
+            files_en.append(discord.File(io.BytesIO(file_bytes), filename=filename))
+
+        await _send_and_publish(en_channel, english_message, files_en)
         await _ghost_ping(en_channel)
 
         await interaction.followup.send(
