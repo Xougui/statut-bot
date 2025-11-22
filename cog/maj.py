@@ -448,7 +448,7 @@ class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
     def __init__(self, attachments: list[discord.Attachment]) -> None:
         super().__init__()
         self.attachments = attachments
-        self.api_url_gemini = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key={gemini_api_key}"
+        self.api_url_gemini = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_api_key}"
         try:
             with open("version.json") as f:
                 self.version_number.default = json.load(f).get("version", "1.0.0")
