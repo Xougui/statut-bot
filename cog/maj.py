@@ -300,7 +300,7 @@ def _build_message(texts: dict, is_english: bool) -> str:
 class EditUpdateModal(ui.Modal):
     """Modal pour éditer le texte de la mise à jour (FR ou EN)."""
 
-    def __init__(self, texts: dict, is_english: bool, view: "UpdateManagerView"):
+    def __init__(self, texts: dict, is_english: bool, view: "UpdateManagerView") -> None:
         title = "Éditer texte (Anglais)" if is_english else "Éditer texte (Français)"
         super().__init__(title=title)
         self.texts = texts
@@ -334,7 +334,7 @@ class EditUpdateModal(ui.Modal):
         self.add_item(self.changes_input)
         self.add_item(self.outro_input)
 
-    async def on_submit(self, interaction: discord.Interaction):
+    async def on_submit(self, interaction: discord.Interaction) -> None:
         new_texts = {
             "title": self.title_input.value,
             "intro": self.intro_input.value,
@@ -359,14 +359,14 @@ class UpdateManagerView(ui.View):
         en_texts: dict,
         files_data: list[tuple[str, bytes]],
         original_interaction: discord.Interaction,
-    ):
+    ) -> None:
         super().__init__(timeout=None)
         self.fr_texts = fr_texts
         self.en_texts = en_texts
         self.files_data = files_data  # List of (filename, bytes)
         self.original_interaction = original_interaction
 
-    async def refresh_message(self, interaction: discord.Interaction):
+    async def refresh_message(self, interaction: discord.Interaction) -> None:
         """Met à jour le message de test avec les nouvelles données."""
         french_message = _build_message(self.fr_texts, is_english=False)
         english_message = _build_message(self.en_texts, is_english=True)
@@ -389,9 +389,7 @@ class UpdateManagerView(ui.View):
             )
 
     @ui.button(label="Envoyer Production", style=discord.ButtonStyle.green)
-    async def send_prod(
-        self, interaction: discord.Interaction, button: ui.Button
-    ):
+    async def send_prod(self, interaction: discord.Interaction, button: ui.Button) -> None:
         await interaction.response.defer()
 
         # Disable buttons to prevent double click
@@ -419,23 +417,27 @@ class UpdateManagerView(ui.View):
         await _send_and_publish(en_channel, english_message, None)
         await _ghost_ping(en_channel)
 
-        await interaction.followup.send("✅ Mise à jour déployée en production !", ephemeral=True)
+        await interaction.followup.send(
+            "✅ Mise à jour déployée en production !", ephemeral=True
+        )
 
     @ui.button(label="Éditer FR", style=discord.ButtonStyle.blurple)
-    async def edit_fr(self, interaction: discord.Interaction, button: ui.Button):
+    async def edit_fr(self, interaction: discord.Interaction, button: ui.Button) -> None:
         await interaction.response.send_modal(
             EditUpdateModal(self.fr_texts, is_english=False, view=self)
         )
 
     @ui.button(label="Éditer EN", style=discord.ButtonStyle.blurple)
-    async def edit_en(self, interaction: discord.Interaction, button: ui.Button):
+    async def edit_en(self, interaction: discord.Interaction, button: ui.Button) -> None:
         await interaction.response.send_modal(
             EditUpdateModal(self.en_texts, is_english=True, view=self)
         )
 
     @ui.button(label="Annuler", style=discord.ButtonStyle.red)
-    async def cancel(self, interaction: discord.Interaction, button: ui.Button):
-        await interaction.response.send_message("❌ Mise à jour annulée.", ephemeral=True)
+    async def cancel(self, interaction: discord.Interaction, button: ui.Button) -> None:
+        await interaction.response.send_message(
+            "❌ Mise à jour annulée.", ephemeral=True
+        )
         # Disable buttons
         for child in self.children:
             child.disabled = True
@@ -517,26 +519,32 @@ class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
         # Prepare files for the test message
         files_objects = []
         for filename, file_bytes in files_data:
-            files_objects.append(discord.File(io.BytesIO(file_bytes), filename=filename))
+            files_objects.append(
+                discord.File(io.BytesIO(file_bytes), filename=filename)
+            )
 
         french_message = _build_message(corrected_texts, is_english=False)
         english_message = _build_message(translated_texts, is_english=True)
         full_test_message = f"{french_message}\n\n---\n\n{english_message}"
 
-        await followup_message.edit(content="📤 Envoi de la prévisualisation sur le canal test...")
+        await followup_message.edit(
+            content="📤 Envoi de la prévisualisation sur le canal test..."
+        )
 
         test_channel = interaction.guild.get_channel(PARAM.UPDATE_CHANNEL_ID_TEST)
 
-        view = UpdateManagerView(corrected_texts, translated_texts, files_data, interaction)
+        view = UpdateManagerView(
+            corrected_texts, translated_texts, files_data, interaction
+        )
 
         await test_channel.send(
-            content=full_test_message,
-            files=files_objects,
-            view=view
+            content=full_test_message, files=files_objects, view=view
         )
         await _ghost_ping(test_channel)
 
-        await followup_message.edit(content="🎉 Prévisualisation envoyée ! Vérifiez le canal test.")
+        await followup_message.edit(
+            content="🎉 Prévisualisation envoyée ! Vérifiez le canal test."
+        )
 
     def _save_version(self):
         try:
@@ -556,9 +564,7 @@ class ManagementCog(commands.Cog):
     @app_commands.command(
         name="update", description="[🤖 Dev] Envoie une annonce de mise à jour."
     )
-    @app_commands.describe(
-        attachments="Fichier à joindre."
-    )
+    @app_commands.describe(attachments="Fichier à joindre.")
     @is_owner()
     async def update_command(
         self,
@@ -566,9 +572,7 @@ class ManagementCog(commands.Cog):
         attachments: discord.Attachment | None = None,
     ) -> None:
         files = [attachments] if attachments else []
-        await interaction.response.send_modal(
-            UpdateModal(attachments=files)
-        )
+        await interaction.response.send_modal(UpdateModal(attachments=files))
 
     @app_commands.command(
         name="patch-note",
