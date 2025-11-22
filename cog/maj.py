@@ -548,7 +548,6 @@ class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
         await test_channel.send(
             content=full_test_message, files=files_objects, view=view
         )
-        await _ghost_ping(test_channel)
 
         await followup_message.edit(
             content="🎉 Prévisualisation envoyée ! Vérifiez le canal test."
