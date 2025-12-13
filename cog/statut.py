@@ -41,14 +41,14 @@ class Status(Enum):
 
 
 class Statut(commands.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot) -> None:
         self.bot = bot
         self._last_known_status: Status | None = None
         self._manual_reason: str | None = None
         self._update_lock = asyncio.Lock()
         self._automatic_check_task.start()
 
-    def cog_unload(self):
+    def cog_unload(self) -> None:
         self._automatic_check_task.cancel()
 
     # --- Fonctions d'analyse de statut ---
@@ -226,7 +226,7 @@ class Statut(commands.Cog):
     # --- Tâche de vérification et de mise à jour ---
 
     @tasks.loop(seconds=5)
-    async def _automatic_check_task(self):
+    async def _automatic_check_task(self) -> None:
         """Tâche de fond qui appelle la logique de mise à jour principale."""
         await self._update_status_logic()
 
@@ -241,10 +241,12 @@ class Statut(commands.Cog):
             is_interactive = interaction is not None
 
             if is_interactive:
-                status_msg = forced_status.value if forced_status else 'auto'
+                status_msg = forced_status.value if forced_status else "auto"
                 if reason:
                     status_msg += f" (Raison: {reason})"
-                progress_log.append(f"⏳ **Mise à jour vers `{status_msg}` en cours...**")
+                progress_log.append(
+                    f"⏳ **Mise à jour vers `{status_msg}` en cours...**"
+                )
                 await interaction.edit_original_response(
                     content="\n".join(progress_log)
                 )
@@ -378,7 +380,7 @@ class Statut(commands.Cog):
                 )
 
     @_automatic_check_task.before_loop
-    async def before_check(self):
+    async def before_check(self) -> None:
         await self.bot.wait_until_ready()
         log.info("Initialisation du statut avant le démarrage de la boucle...")
         channel = self.bot.get_channel(CHANNEL_ID)
@@ -442,5 +444,5 @@ class Statut(commands.Cog):
             )
 
 
-async def setup(bot):
+async def setup(bot) -> None:
     await bot.add_cog(Statut(bot))
