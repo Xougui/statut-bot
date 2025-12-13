@@ -411,8 +411,8 @@ class Statut(commands.Cog):
         mode=[
             app_commands.Choice(name="🟢 Online", value="online"),
             app_commands.Choice(name="🔴 Offline", value="offline"),
-            app_commands.Choice(name="🛠️ Maintenance", value="maintenance"),
-            app_commands.Choice(name="⚙️ Automatique", value="automatique"),
+            app_commands.Choice(name="🔵 Maintenance", value="maintenance"),
+            app_commands.Choice(name="🤖 Automatique", value="automatique"),
         ]
     )
     @commands.is_owner()
