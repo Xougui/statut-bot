@@ -33,15 +33,16 @@ COLOR_MAINTENANCE = 0x004AAD
 PARIS_TZ = pytz.timezone("Europe/Paris")
 
 
-# --- Énumération pour les statuts possibles ---
 class Status(Enum):
+    """Énumération pour les statuts possibles."""
+
     ONLINE = "online"
     OFFLINE = "offline"
     MAINTENANCE = "maintenance"
 
 
 class Statut(commands.Cog):
-    def __init__(self, bot) -> None:
+    def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self._last_known_status: Status | None = None
         self._manual_reason: str | None = None
@@ -54,28 +55,30 @@ class Statut(commands.Cog):
     # --- Fonctions d'analyse de statut ---
 
     def _get_status_from_embed(self, embed: discord.Embed | None) -> Status | None:
-        if not embed or not embed.title:  # E701
+        """Détermine le statut à partir d'un embed."""
+        if not embed or not embed.title:
             return None
         title = embed.title.lower()
-        if "en ligne" in title:  # E701
+        if "en ligne" in title or "online" in title:
             return Status.ONLINE
-        if "hors ligne" in title:  # E701
+        if "hors ligne" in title or "offline" in title:
             return Status.OFFLINE
-        if "en maintenance" in title:  # E701
+        if "en maintenance" in title or "maintenance" in title:
             return Status.MAINTENANCE
         return None
 
     def _get_status_from_channel_name(
         self, channel: discord.TextChannel | None
     ) -> Status | None:
-        if not channel:  # E701
+        """Détermine le statut à partir du nom du salon."""
+        if not channel:
             return None
         name = channel.name.lower()
-        if "online" in name or "🟢" in name:  # E701
+        if "online" in name or "🟢" in name:
             return Status.ONLINE
-        if "offline" in name or "🔴" in name:  # E701
+        if "offline" in name or "🔴" in name:
             return Status.OFFLINE
-        if "maintenance" in name or "🔵" in name:  # E701
+        if "maintenance" in name or "🔵" in name:
             return Status.MAINTENANCE
         return None
 
@@ -84,7 +87,9 @@ class Statut(commands.Cog):
     async def _update_embed(
         self, message: discord.Message, status: Status, reason: str | None = None
     ) -> bool:
+        """Met à jour l'embed de statut."""
         maj = datetime.datetime.now(PARIS_TZ).strftime("%d/%m/%Y %H:%M:%S")
+
         embed_builders = {
             Status.ONLINE: lambda: discord.Embed(
                 title=f"{ONLINE_EMOJI}・**Bot en ligne**",
@@ -103,7 +108,7 @@ class Statut(commands.Cog):
             ),
         }
         builder = embed_builders.get(status)
-        if not builder:  # E701
+        if not builder:
             return False
 
         embed = builder()
@@ -124,54 +129,51 @@ class Statut(commands.Cog):
         channel: discord.TextChannel,
         status: Status,
         interaction: discord.Interaction | None = None,
-        progress_log: list | None = None,
+        progress_log: list[str] | None = None,
     ) -> bool:
+        """Met à jour le nom du salon."""
         name_map = {
             Status.ONLINE: "═🟢・online",
             Status.OFFLINE: "═🔴・offline",
             Status.MAINTENANCE: "═🔵・maintenance",
         }
         new_name = name_map.get(status)
-        if not new_name or channel.name == new_name:  # E701
+        if not new_name or channel.name == new_name:
             return True
-        while True:
-            try:
-                await channel.edit(name=new_name)
-                log.info(f"Nom du salon changé en '{new_name}'.")
-                return True
-            except discord.HTTPException as e:
-                if e.status == 429:
-                    retry_after = e.retry_after or 5.0
-                    log.warning(
-                        f"Rate limited (channel name): waiting {retry_after:.2f}s."
-                    )
-                    if interaction and progress_log:
-                        try:
-                            progress_log.append(
-                                f"⏳ Nom du salon rate limited. Réessai dans {retry_after:.2f}s..."
-                            )
-                            await interaction.edit_original_response(
-                                content="\n".join(progress_log)
-                            )
-                        except discord.HTTPException:  # E701
-                            pass
-                    await asyncio.sleep(retry_after)
-                    if interaction and progress_log:
-                        with contextlib.suppress(
-                            IndexError
-                        ):  # E701: Multiple statements on one line (colon)
-                            progress_log.pop()
-                elif e.status == 403:
-                    log.error("Erreur 403 (Permissions) pour changer le nom du salon.")
-                    return False
-                else:
-                    log.error(
-                        f"Erreur HTTP ({e.status}) en changeant le nom du salon: {e}"
-                    )
-                    return False
-            except Exception as e:
-                log.error(f"Erreur inattendue en changeant le nom du salon: {e}")
+
+        try:
+            await channel.edit(name=new_name)
+            log.info(f"Nom du salon changé en '{new_name}'.")
+            return True
+        except discord.HTTPException as e:
+            if e.status == 429:
+                retry_after = e.retry_after or 5.0
+                log.warning(f"Rate limited (channel name): waiting {retry_after:.2f}s.")
+                if interaction and progress_log is not None:
+                    try:
+                        progress_log.append(
+                            f"⏳ Nom du salon rate limited. Réessai dans {retry_after:.2f}s..."
+                        )
+                        await interaction.edit_original_response(
+                            content="\n".join(progress_log)
+                        )
+                    except discord.HTTPException:
+                        pass
+                await asyncio.sleep(retry_after)
+                if interaction and progress_log is not None:
+                    with contextlib.suppress(IndexError):
+                        progress_log.pop()
+                # On pourrait ré-essayer ici, mais la boucle s'en chargera
                 return False
+            elif e.status == 403:
+                log.error("Erreur 403 (Permissions) pour changer le nom du salon.")
+                return False
+            else:
+                log.error(f"Erreur HTTP ({e.status}) en changeant le nom du salon: {e}")
+                return False
+        except Exception as e:
+            log.error(f"Erreur inattendue en changeant le nom du salon: {e}")
+            return False
 
     async def _send_log(
         self,
@@ -179,25 +181,30 @@ class Statut(commands.Cog):
         status: Status,
         manual: bool,
         reason: str | None = None,
-    ) -> bool | None:
+    ) -> bool:
+        """Envoie un log dans le salon dédié."""
         emoji_map = {
             Status.ONLINE: ONLINE_EMOJI,
             Status.OFFLINE: OFFLINE_EMOJI,
             Status.MAINTENANCE: MAINTENANCE_EMOJI,
         }
+
+        color_map = {
+            Status.ONLINE: COLOR_ONLINE,
+            Status.OFFLINE: COLOR_OFFLINE,
+            Status.MAINTENANCE: COLOR_MAINTENANCE,
+        }
+
         log_embed = discord.Embed(
             title=f"{emoji_map.get(status)}・Bot {status.value}",
             description=f"Le bot est maintenant **{status.value}**.",
-            color=COLOR_ONLINE
-            if status == Status.ONLINE
-            else COLOR_OFFLINE
-            if status == Status.OFFLINE
-            else COLOR_MAINTENANCE,
+            color=color_map.get(status, COLOR_OFFLINE),
         )
-        if manual:  # E701
+        if manual:
             log_embed.description += " (défini manuellement)"
         if reason:
             log_embed.description += f"\n**Raison:** {reason}"
+
         try:
             await logs_channel.send(embed=log_embed)
             log.info(f"Message de log envoyé pour le statut {status.name}.")
@@ -206,10 +213,9 @@ class Statut(commands.Cog):
             log.error(f"Erreur HTTP lors de l'envoi du log: {e}")
             return False
 
-    async def _send_ping(
-        self, channel: discord.TextChannel, status: Status
-    ) -> bool | None:
-        if status == Status.MAINTENANCE:  # E701
+    async def _send_ping(self, channel: discord.TextChannel, status: Status) -> bool:
+        """Envoie un ping temporaire."""
+        if status == Status.MAINTENANCE:
             return True
         try:
             ping_message = await channel.send(
@@ -230,6 +236,34 @@ class Statut(commands.Cog):
         """Tâche de fond qui appelle la logique de mise à jour principale."""
         await self._update_status_logic()
 
+    async def _get_target_status(self) -> Status | None:
+        """Détermine le statut cible en fonction de l'état du bot surveillé."""
+        # Si on surveille le bot lui-même
+        if self.bot.user.id == BOT_ID:
+            # On considère qu'il est ONLINE si le code tourne
+            # (Sauf si on implémente une logique spécifique)
+            return Status.ONLINE
+
+        # Sinon on cherche le membre dans les serveurs communs
+        target_bot_member = None
+        for guild in self.bot.guilds:
+            member = guild.get_member(BOT_ID)
+            if member:
+                target_bot_member = member
+                break
+
+        if not target_bot_member:
+            # On ne trouve pas le bot -> warning mais on ne peut rien dire
+            # Ou on considère OFFLINE ?
+            # Pour l'instant on log juste
+            return None
+
+        return (
+            Status.ONLINE
+            if target_bot_member.status != discord.Status.offline
+            else Status.OFFLINE
+        )
+
     async def _update_status_logic(
         self,
         interaction: discord.Interaction | None = None,
@@ -240,43 +274,46 @@ class Statut(commands.Cog):
             progress_log = []
             is_interactive = interaction is not None
 
-            if is_interactive:
+            if is_interactive and interaction:
                 status_msg = forced_status.value if forced_status else "auto"
                 if reason:
                     status_msg += f" (Raison: {reason})"
                 progress_log.append(
                     f"⏳ **Mise à jour vers `{status_msg}` en cours...**"
                 )
-                await interaction.edit_original_response(
-                    content="\n".join(progress_log)
-                )
+                with contextlib.suppress(discord.InteractionResponded):
+                    await interaction.edit_original_response(
+                        content="\n".join(progress_log)
+                    )
 
             # 1. Déterminer le statut cible
             is_manual = forced_status is not None
-            if is_manual:
+            if is_manual and forced_status:
                 target_status = forced_status
             else:
-                target_bot_member = next(
-                    (
-                        g.get_member(BOT_ID)
-                        for g in self.bot.guilds
-                        if g.get_member(BOT_ID)
-                    ),
-                    None,
-                )
-                if not target_bot_member:
-                    log.warning(f"Bot cible (ID: {BOT_ID}) introuvable.")
+                target_status_detected = await self._get_target_status()
+                if target_status_detected is None:
+                    # On n'a pas pu déterminer le statut cible (bot introuvable)
+                    # On garde l'ancien ou on ne fait rien
+                    if is_interactive and interaction:
+                        await interaction.followup.send(
+                            "⚠️ Impossible de trouver le bot cible.", ephemeral=True
+                        )
                     return
-                target_status = (
-                    Status.ONLINE
-                    if target_bot_member.status != discord.Status.offline
-                    else Status.OFFLINE
-                )
+                target_status = target_status_detected
 
             # 2. Récupérer les indicateurs visuels
             channel = self.bot.get_channel(CHANNEL_ID)
-            if not channel:  # E701
+            if not channel or not isinstance(channel, discord.TextChannel):
+                log.error(
+                    f"Salon de statut (ID: {CHANNEL_ID}) introuvable ou invalide."
+                )
+                if is_interactive and interaction:
+                    await interaction.followup.send(
+                        "❌ Salon de statut introuvable.", ephemeral=True
+                    )
                 return
+
             try:
                 message = await channel.fetch_message(MESSAGE_ID)
                 embed_status = self._get_status_from_embed(
@@ -286,8 +323,7 @@ class Statut(commands.Cog):
                 log.error(
                     f"Impossible de récupérer le message de statut (ID: {MESSAGE_ID}). Erreur: {e}"
                 )
-                if is_interactive:
-                    # E701: Multiple statements on one line (colon)
+                if is_interactive and interaction:
                     await interaction.followup.send(
                         "❌ Message de statut introuvable.", ephemeral=True
                     )
@@ -309,8 +345,7 @@ class Statut(commands.Cog):
                 and not name_is_inconsistent
                 and not is_manual
             ):
-                if is_interactive:
-                    # E701: Multiple statements on one line (colon)
+                if is_interactive and interaction:
                     await interaction.edit_original_response(
                         content="✅ Tout est déjà à jour."
                     )
@@ -319,12 +354,12 @@ class Statut(commands.Cog):
             # Actions de mise à jour
             if embed_is_inconsistent or is_manual:
                 if await self._update_embed(message, target_status, reason=reason):
-                    if is_interactive:
+                    if is_interactive and interaction:
                         progress_log.append("✅ Message de statut mis à jour.")
                         await interaction.edit_original_response(
                             content="\n".join(progress_log)
                         )
-                elif is_interactive:
+                elif is_interactive and interaction:
                     progress_log.append("❌ Échec de la mise à jour du message.")
                     await interaction.edit_original_response(
                         content="\n".join(progress_log)
@@ -337,12 +372,12 @@ class Statut(commands.Cog):
                     interaction,
                     progress_log if is_interactive else None,
                 ):
-                    if is_interactive:
+                    if is_interactive and interaction:
                         progress_log.append("✅ Nom du salon mis à jour.")
                         await interaction.edit_original_response(
                             content="\n".join(progress_log)
                         )
-                elif is_interactive:
+                elif is_interactive and interaction:
                     progress_log.append("❌ Échec de la mise à jour du nom du salon.")
                     await interaction.edit_original_response(
                         content="\n".join(progress_log)
@@ -352,28 +387,26 @@ class Statut(commands.Cog):
             if status_has_changed or (
                 is_manual and target_status != self._last_known_status
             ):
-                # SIM102: Use a single `if` statement
-                if (
-                    (logs_channel := self.bot.get_channel(LOGS_CHANNEL_ID))
-                    and await self._send_log(
+                logs_channel = self.bot.get_channel(LOGS_CHANNEL_ID)
+                if isinstance(logs_channel, discord.TextChannel):
+                    if await self._send_log(
                         logs_channel, target_status, manual=is_manual, reason=reason
-                    )
-                    and is_interactive
-                ):
-                    progress_log.append("📄 Message de log envoyé.")
-                    await interaction.edit_original_response(
-                        content="\n".join(progress_log)
-                    )
+                    ) and is_interactive and interaction:
+                        progress_log.append("📄 Message de log envoyé.")
+                        await interaction.edit_original_response(
+                            content="\n".join(progress_log)
+                        )
 
-                if await self._send_ping(channel, target_status) and is_interactive:
-                    progress_log.append("🔔 Notification envoyée.")
-                    await interaction.edit_original_response(
-                        content="\n".join(progress_log)
-                    )
+                if await self._send_ping(channel, target_status):
+                    if is_interactive and interaction:
+                        progress_log.append("🔔 Notification envoyée.")
+                        await interaction.edit_original_response(
+                            content="\n".join(progress_log)
+                        )
 
             self._last_known_status = target_status
 
-            if is_interactive:
+            if is_interactive and interaction:
                 progress_log.append("\n🎉 Opération terminée.")
                 await interaction.edit_original_response(
                     content="\n".join(progress_log)
@@ -384,7 +417,7 @@ class Statut(commands.Cog):
         await self.bot.wait_until_ready()
         log.info("Initialisation du statut avant le démarrage de la boucle...")
         channel = self.bot.get_channel(CHANNEL_ID)
-        if not channel:  # E701
+        if not channel or not isinstance(channel, discord.TextChannel):
             return
         try:
             message = await channel.fetch_message(MESSAGE_ID)
@@ -444,5 +477,5 @@ class Statut(commands.Cog):
             )
 
 
-async def setup(bot) -> None:
+async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(Statut(bot))
