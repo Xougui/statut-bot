@@ -1,4 +1,65 @@
+# Fichiers d'environnement
+# Ne jamais versionner les fichiers .env qui contiennent des secrets !
 .env
-**/__pycache__/
-**/*.pyc
-pyproject.toml
+.env.*
+.venv
+env/
+venv/
+ENV/
+env.bak
+venv.bak
+
+# Fichiers spécifiques aux IDEs et éditeurs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Fichiers de cache et d'exécution Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Cache de test et rapports
+.pytest_cache/
+pytest_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+*.cover
+
+# Fichiers de logs
+*.log
+
+
+# Fichiers générés par le système d'exploitation
+.DS_Store
+Thumbs.db
+
+database/database.db
+database/database.db-shm
+database/database.db-wal
