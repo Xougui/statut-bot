@@ -487,12 +487,8 @@ class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
             "outro": self.outro_message.value or "",
         }
 
-        corrected_texts = await _correct_french_text(
-            original_texts
-        )
-        translated_texts = await _translate_to_english(
-            corrected_texts
-        )
+        corrected_texts = await _correct_french_text(original_texts)
+        translated_texts = await _translate_to_english(corrected_texts)
 
         if not translated_texts.get("title") or not translated_texts.get("changes"):
             await followup_message.edit(
