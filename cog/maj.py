@@ -8,7 +8,8 @@ import discord
 from discord import app_commands, ui
 from discord.ext import commands
 from dotenv import load_dotenv
-import requests
+from google import genai
+from google.genai import types
 
 import PARAM
 
@@ -21,6 +22,9 @@ load_dotenv()
 
 # Récupération de la clé API Gemini depuis les variables d'environnement
 gemini_api_key = os.getenv("GEMINI_API")
+
+# Client instance
+client = genai.Client(api_key=gemini_api_key)
 
 # --- Helpers ---
 
@@ -115,66 +119,45 @@ async def _send_and_publish(
 # --- Translation and Correction ---
 
 
-async def _call_gemini_api(prompt: str, schema: dict, api_url: str) -> dict | None:
+async def _call_gemini_api(prompt: str, schema: dict) -> dict | None:
     """Appelle l'API Gemini avec une nouvelle tentative en cas d'échec."""
-    payload = {
-        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "responseMimeType": "application/json",
-            "responseSchema": schema,
-        },
-    }
     max_retries = 3
     for attempt in range(max_retries):
         try:
             response = await asyncio.to_thread(
-                lambda: requests.post(
-                    api_url,
-                    headers={"Content-Type": "application/json"},
-                    data=json.dumps(payload),
+                lambda: client.models.generate_content(
+                    model="gemini-1.5-flash",
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=schema,
+                    ),
                 )
             )
-            response.raise_for_status()
-            result = response.json()
-            if (
-                result.get("candidates")
-                and result["candidates"][0].get("content")
-                and result["candidates"][0]["content"].get("parts")
-            ):
-                json_str = result["candidates"][0]["content"]["parts"][0]["text"]
 
-                # Extrait le JSON même s'il est enrobé dans du Markdown
+            if response.text:
                 try:
-                    json_start = json_str.index("{")
-                    json_end = json_str.rindex("}") + 1
-                    json_str = json_str[json_start:json_end]
-                    return json.loads(json_str)
+                    return json.loads(response.text)
                 except (ValueError, json.JSONDecodeError) as e:
                     logging.error(
-                        f"Error parsing JSON from Gemini: {e}\nResponse received: {json_str}"
+                        f"Error parsing JSON from Gemini: {e}\nResponse received: {response.text}"
                     )
                     return None
             else:
                 logging.warning("Structure de réponse de l'API Gemini inattendue.")
                 return None
-        except requests.exceptions.RequestException as e:
+
+        except Exception as e:
             logging.error(
                 f"Erreur API Gemini (tentative {attempt + 1}/{max_retries}): {e}"
             )
             await asyncio.sleep(2**attempt)
-        except json.JSONDecodeError as e:
-            logging.error(f"Erreur de décodage JSON de la réponse Gemini: {e}")
-            return None
-        except Exception as e:
-            logging.error(
-                f"Erreur inattendue lors de l'appel à l'API Gemini: {e}", exc_info=True
-            )
-            return None
+
     logging.error(f"Échec de l'appel à l'API Gemini après {max_retries} tentatives.")
     return None
 
 
-async def _correct_french_text(text_parts: dict, api_url: str) -> dict:
+async def _correct_french_text(text_parts: dict) -> dict:
     """Corrige le texte français en utilisant l'API Gemini."""
     prompt = (
         "Agis comme un correcteur orthographique et grammatical expert. Corrige le texte français suivant. "
@@ -203,7 +186,7 @@ async def _correct_french_text(text_parts: dict, api_url: str) -> dict:
             "corrected_outro",
         ],
     }
-    corrected_data = await _call_gemini_api(prompt, schema, api_url)
+    corrected_data = await _call_gemini_api(prompt, schema)
     if corrected_data:
         logging.info("Correction française réussie.")
         return {
@@ -218,7 +201,7 @@ async def _correct_french_text(text_parts: dict, api_url: str) -> dict:
     return text_parts
 
 
-async def _translate_to_english(text_parts: dict, api_url: str) -> dict:
+async def _translate_to_english(text_parts: dict) -> dict:
     """Traduit le texte en anglais en utilisant l'API Gemini."""
     prompt = (
         "Agis comme un traducteur expert du français vers l'anglais. Traduis le texte suivant.\n"
@@ -242,7 +225,7 @@ async def _translate_to_english(text_parts: dict, api_url: str) -> dict:
         },
         "required": ["title", "changes", "intro", "outro"],
     }
-    translated_data = await _call_gemini_api(prompt, schema, api_url)
+    translated_data = await _call_gemini_api(prompt, schema)
     if translated_data:
         logging.info("Traduction anglaise réussie.")
         return {
@@ -460,7 +443,7 @@ class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
     def __init__(self, attachments: list[discord.Attachment]) -> None:
         super().__init__()
         self.attachments = attachments
-        self.api_url_gemini = f"https://generativelanguage.googleapis.com/v1beta/models/{PARAM.GEMINI_MODEL}:generateContent?key={gemini_api_key}"
+        self.api_url_gemini = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key={gemini_api_key}"
         try:
             with open("version.json") as f:
                 self.version_number.default = json.load(f).get("version", "1.0.0")
@@ -504,12 +487,8 @@ class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
             "outro": self.outro_message.value or "",
         }
 
-        corrected_texts = await _correct_french_text(
-            original_texts, self.api_url_gemini
-        )
-        translated_texts = await _translate_to_english(
-            corrected_texts, self.api_url_gemini
-        )
+        corrected_texts = await _correct_french_text(original_texts)
+        translated_texts = await _translate_to_english(corrected_texts)
 
         if not translated_texts.get("title") or not translated_texts.get("changes"):
             await followup_message.edit(
