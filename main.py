@@ -80,7 +80,7 @@ tz = pytz.timezone("Europe/Paris")
 previous_status = None
 
 
-def is_owner(ctx):  # N802: Function name `isOwner` should be lowercase
+def is_owner(ctx) -> bool:  # N802: Function name `isOwner` should be lowercase
     return ctx.message.author.id in owners
 
 
@@ -118,7 +118,7 @@ bot_start_time = datetime.datetime.now()
 executor = concurrent.futures.ThreadPoolExecutor()
 
 
-def get_directory_size_bytes_sync(path):
+def get_directory_size_bytes_sync(path) -> int:
     """Calcule la taille d'un répertoire de manière synchrone."""
     total_size = 0
     if not os.path.exists(path):
@@ -137,26 +137,26 @@ def get_directory_size_bytes_sync(path):
     return total_size
 
 
-async def get_directory_size_async(path):
+async def get_directory_size_async(path) -> int:
     """Exécute la fonction de taille de répertoire de manière asynchrone."""
     return await asyncio.get_running_loop().run_in_executor(
         executor, get_directory_size_bytes_sync, path
     )
 
 
-def get_process_memory_mo():
+def get_process_memory_mo() -> float:
     process = psutil.Process()
     mem_info = process.memory_info()
     return mem_info.rss / (1024**2)
 
 
-def get_process_virtual_memory_mo():  # Nouvelle fonction
+def get_process_virtual_memory_mo() -> float:  # Nouvelle fonction
     process = psutil.Process()
     mem_info = process.memory_info()
     return mem_info.vms / (1024**2)
 
 
-def get_process_cpu_usage():
+def get_process_cpu_usage() -> float:
     process = psutil.Process()
     # psutil.cpu_percent() peut retourner une valeur agrégée sur tous les cœurs,
     # ou pour le processus spécifique. Pour le processus, on appelle cpu_percent() sans intervalle
@@ -448,7 +448,7 @@ def run_flask_server() -> None:
     log.setLevel(logging.ERROR)
 
     @flask_app.route("/")
-    def home():
+    def home() -> tuple[str, int]:
         return "Manage Bot is alive!", 200
 
     try:
