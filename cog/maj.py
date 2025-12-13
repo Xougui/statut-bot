@@ -29,6 +29,33 @@ client = genai.Client(api_key=gemini_api_key)
 # --- Helpers ---
 
 
+def _split_message(content: str, limit: int = 2000) -> list[str]:
+    """Découpe un message en morceaux de `limit` caractères maximum."""
+    if len(content) <= limit:
+        return [content]
+
+    chunks = []
+    while content:
+        if len(content) <= limit:
+            chunks.append(content)
+            break
+
+        # Tenter de couper au dernier saut de ligne avant la limite
+        split_index = content.rfind("\n", 0, limit)
+        if split_index == -1:
+            # Pas de saut de ligne, on coupe au dernier espace
+            split_index = content.rfind(" ", 0, limit)
+
+        if split_index == -1:
+            # Pas d'espace non plus, on coupe brut
+            split_index = limit
+
+        chunks.append(content[:split_index])
+        content = content[split_index:].lstrip()  # On retire les espaces/sauts de ligne au début du morceau suivant
+
+    return chunks
+
+
 def is_owner():
     """
     Vérifie si l'utilisateur qui exécute la commande est un propriétaire défini dans PARAM.owners.
@@ -71,32 +98,32 @@ async def _send_and_publish(
         return
 
     try:
-        if len(content) > 2000:
-            logging.warning(
-                "Le contenu du message dépasse 2000 caractères et sera tronqué."
-            )
-            content = content[:2000]
+        chunks = _split_message(content)
 
-        msg = await channel.send(content=content, files=files)
+        # On n'envoie les fichiers qu'avec le dernier message
+        for i, chunk in enumerate(chunks):
+            current_files = files if i == len(chunks) - 1 else None
 
-        if channel.is_news():
+            msg = await channel.send(content=chunk, files=current_files)
+
+            if channel.is_news():
+                try:
+                    await msg.publish()
+                    logging.info(f"Message publié dans le canal d'annonces {channel.name}.")
+                except discord.Forbidden:
+                    logging.error(
+                        f"Permissions insuffisantes pour publier dans {channel.name}."
+                    )
+                except Exception as e:
+                    logging.error(f"Erreur lors de la publication dans {channel.name}: {e}")
+
             try:
-                await msg.publish()
-                logging.info(f"Message publié dans le canal d'annonces {channel.name}.")
-            except discord.Forbidden:
-                logging.error(
-                    f"Permissions insuffisantes pour publier dans {channel.name}."
+                verify_emoji = discord.PartialEmoji(
+                    name="verify", animated=True, id=1350435235015426130
                 )
+                await msg.add_reaction(verify_emoji)
             except Exception as e:
-                logging.error(f"Erreur lors de la publication dans {channel.name}: {e}")
-
-        try:
-            verify_emoji = discord.PartialEmoji(
-                name="verify", animated=True, id=1350435235015426130
-            )
-            await msg.add_reaction(verify_emoji)
-        except Exception as e:
-            logging.error(f"Impossible d'ajouter la réaction: {e}")
+                logging.error(f"Impossible d'ajouter la réaction: {e}")
 
     except discord.Forbidden:
         logging.error(
@@ -357,20 +384,52 @@ class UpdateManagerView(ui.View):
         english_message = _build_message(self.en_texts, is_english=True)
         full_test_message = f"{french_message}\n\n---\n\n{english_message}"
 
-        # Re-create files from bytes
-        files = []
-        for filename, file_bytes in self.files_data:
-            files.append(discord.File(io.BytesIO(file_bytes), filename=filename))
+        chunks = _split_message(full_test_message)
 
-        # If we are replying to the interaction (Modal submit), we use response.edit_message
+        # Helper pour recréer les fichiers (les objets File sont consommés à l'envoi)
+        def get_files():
+            files = []
+            for filename, file_bytes in self.files_data:
+                files.append(discord.File(io.BytesIO(file_bytes), filename=filename))
+            return files
+
+        # Si un seul morceau, on édite simplement le message existant
+        if len(chunks) == 1:
+            if not interaction.response.is_done():
+                await interaction.response.edit_message(
+                    content=chunks[0], attachments=get_files(), view=self
+                )
+            else:
+                await interaction.edit_original_response(
+                    content=chunks[0], attachments=get_files(), view=self
+                )
+            return
+
+        # Si plusieurs morceaux, on doit supprimer l'ancien message et en envoyer de nouveaux
+        # car on ne peut pas transformer un message en plusieurs via edit
         if not interaction.response.is_done():
-            await interaction.response.edit_message(
-                content=full_test_message, attachments=files, view=self
-            )
-        else:
-            # Fallback
-            await interaction.edit_original_response(
-                content=full_test_message, attachments=files, view=self
+            await interaction.response.defer()
+
+        # Supprimer l'ancien message (celui qui contient les boutons)
+        if interaction.message:
+            try:
+                await interaction.message.delete()
+            except (discord.HTTPException, discord.Forbidden):
+                pass  # Le message n'existe plus ou on ne peut pas le supprimer
+
+        channel = interaction.channel
+        if not channel:
+            # Fallback (peu probable)
+            await interaction.followup.send("❌ Erreur: Canal introuvable pour le rafraîchissement.", ephemeral=True)
+            return
+
+        for i, chunk in enumerate(chunks):
+            is_last = (i == len(chunks) - 1)
+            current_view = self if is_last else None
+            current_files = get_files() if is_last else None
+
+            await channel.send(
+                content=chunk, files=current_files, view=current_view
             )
 
     @ui.button(label="Envoyer Production", style=discord.ButtonStyle.green)
@@ -526,9 +585,17 @@ class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
             corrected_texts, translated_texts, files_data, interaction
         )
 
-        await test_channel.send(
-            content=full_test_message, files=files_objects, view=view
-        )
+        chunks = _split_message(full_test_message)
+
+        for i, chunk in enumerate(chunks):
+            # On attache la vue et les fichiers uniquement au dernier message
+            is_last = (i == len(chunks) - 1)
+            current_view = view if is_last else None
+            current_files = files_objects if is_last else None
+
+            await test_channel.send(
+                content=chunk, files=current_files, view=current_view
+            )
 
         await followup_message.edit(
             content="🎉 Prévisualisation envoyée ! Vérifiez le canal test."
