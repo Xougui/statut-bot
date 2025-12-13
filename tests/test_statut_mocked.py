@@ -3,7 +3,7 @@
 # Since PARAM is imported at top level in cog/statut.py, we need to patch it before import
 # or relying on the fact that we can patch 'cog.statut.PARAM' after import if we are careful.
 # However, cog/statut.py does:
-# BOT_ID = PARAM.BOT_ID
+# assigns BOT_ID from PARAM.BOT_ID
 # So updating PARAM after import won't change BOT_ID in statut.py
 # We must patch sys.modules or use patch.dict on os.environ if it used env vars, but it uses PARAM.
 # Strategy: Mock PARAM completely before importing cog.statut
@@ -24,11 +24,11 @@ mock_param.online = "🟢"
 mock_param.maintenance = "🔵"
 sys.modules["PARAM"] = mock_param
 
-from cog.statut import Status, Statut
+from cog.statut import Status, Statut  # noqa: E402
 
 
 @pytest.fixture
-def mock_bot():
+def mock_bot() -> MagicMock:
     bot = MagicMock()
     bot.wait_until_ready = AsyncMock()
     # Mock loop
@@ -38,7 +38,7 @@ def mock_bot():
 
 
 @pytest.fixture
-def statut_cog(mock_bot):
+def statut_cog(mock_bot: MagicMock) -> Statut:
     # Prevent the task from starting automatically during init
     with patch("discord.ext.tasks.Loop.start") as mock_start:
         cog = Statut(mock_bot)
