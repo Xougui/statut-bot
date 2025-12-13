@@ -24,10 +24,10 @@ exclude = [
     "docs",
 ]
 
-ignore = ["E501", "ANN001", "ANN401", "ARG001", "ARG002", "RUF001"] 
+ignore = ["E501", "ANN001", "ARG001", "ARG002", "RUF001"] 
 
 [tool.ruff.lint.flake8-annotations]
-ignore-fully-untyped = true  
+ignore-fully-untyped = false  
 suppress-none-returning = false
 
 [tool.ruff.lint.per-file-ignores]
