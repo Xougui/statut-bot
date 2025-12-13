@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import io
 import json
 import logging
@@ -58,7 +59,7 @@ def _split_message(content: str, limit: int = 2000) -> list[str]:
     return chunks
 
 
-def is_owner():
+def is_owner() -> app_commands.Check:
     """
     Vérifie si l'utilisateur qui exécute la commande est un propriétaire défini dans PARAM.owners.
     """
@@ -393,7 +394,7 @@ class UpdateManagerView(ui.View):
         chunks = _split_message(full_test_message)
 
         # Helper pour recréer les fichiers (les objets File sont consommés à l'envoi)
-        def get_files():
+        def get_files() -> list[discord.File]:
             files = []
             for filename, file_bytes in self.files_data:
                 files.append(discord.File(io.BytesIO(file_bytes), filename=filename))
@@ -418,10 +419,8 @@ class UpdateManagerView(ui.View):
 
         # Supprimer l'ancien message (celui qui contient les boutons)
         if interaction.message:
-            try:
+            with contextlib.suppress(discord.HTTPException, discord.Forbidden):
                 await interaction.message.delete()
-            except (discord.HTTPException, discord.Forbidden):
-                pass  # Le message n'existe plus ou on ne peut pas le supprimer
 
         channel = interaction.channel
         if not channel:
