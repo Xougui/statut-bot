@@ -44,6 +44,7 @@ class Statut(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self._last_known_status: Status | None = None
+        self._manual_reason: str | None = None
         self._update_lock = asyncio.Lock()
         self._automatic_check_task.start()
 
@@ -80,7 +81,9 @@ class Statut(commands.Cog):
 
     # --- Fonctions de mise à jour de bas niveau ---
 
-    async def _update_embed(self, message: discord.Message, status: Status) -> bool:
+    async def _update_embed(
+        self, message: discord.Message, status: Status, reason: str | None = None
+    ) -> bool:
         maj = datetime.datetime.now(PARIS_TZ).strftime("%d/%m/%Y %H:%M:%S")
         embed_builders = {
             Status.ONLINE: lambda: discord.Embed(
@@ -102,7 +105,12 @@ class Statut(commands.Cog):
         builder = embed_builders.get(status)
         if not builder:  # E701
             return False
-        new_embed = builder().set_footer(text=f"Mis à jour le: {maj}")
+
+        embed = builder()
+        if reason:
+            embed.description += f"\n\n**Raison:** {reason}"
+
+        new_embed = embed.set_footer(text=f"Mis à jour le: {maj}")
         try:
             await message.edit(embed=new_embed)
             log.info(f"Embed de statut mis à jour à: {status.name}")
@@ -166,7 +174,11 @@ class Statut(commands.Cog):
                 return False
 
     async def _send_log(
-        self, logs_channel: discord.TextChannel, status: Status, manual: bool
+        self,
+        logs_channel: discord.TextChannel,
+        status: Status,
+        manual: bool,
+        reason: str | None = None,
     ) -> bool | None:
         emoji_map = {
             Status.ONLINE: ONLINE_EMOJI,
@@ -184,6 +196,8 @@ class Statut(commands.Cog):
         )
         if manual:  # E701
             log_embed.description += " (défini manuellement)"
+        if reason:
+            log_embed.description += f"\n**Raison:** {reason}"
         try:
             await logs_channel.send(embed=log_embed)
             log.info(f"Message de log envoyé pour le statut {status.name}.")
@@ -220,15 +234,17 @@ class Statut(commands.Cog):
         self,
         interaction: discord.Interaction | None = None,
         forced_status: Status | None = None,
+        reason: str | None = None,
     ) -> None:
         async with self._update_lock:
             progress_log = []
             is_interactive = interaction is not None
 
             if is_interactive:
-                progress_log.append(
-                    f"⏳ **Mise à jour vers `{forced_status.value if forced_status else 'auto'}` en cours...**"
-                )
+                status_msg = forced_status.value if forced_status else 'auto'
+                if reason:
+                    status_msg += f" (Raison: {reason})"
+                progress_log.append(f"⏳ **Mise à jour vers `{status_msg}` en cours...**")
                 await interaction.edit_original_response(
                     content="\n".join(progress_log)
                 )
@@ -300,7 +316,7 @@ class Statut(commands.Cog):
 
             # Actions de mise à jour
             if embed_is_inconsistent or is_manual:
-                if await self._update_embed(message, target_status):
+                if await self._update_embed(message, target_status, reason=reason):
                     if is_interactive:
                         progress_log.append("✅ Message de statut mis à jour.")
                         await interaction.edit_original_response(
@@ -338,7 +354,7 @@ class Statut(commands.Cog):
                 if (
                     (logs_channel := self.bot.get_channel(LOGS_CHANNEL_ID))
                     and await self._send_log(
-                        logs_channel, target_status, manual=is_manual
+                        logs_channel, target_status, manual=is_manual, reason=reason
                     )
                     and is_interactive
                 ):
@@ -385,7 +401,10 @@ class Statut(commands.Cog):
     # --- Commande manuelle ---
 
     @app_commands.command(name="statut", description="[🤖 Dev] Gère le statut du bot.")
-    @app_commands.describe(mode="Choisissez un mode manuel ou revenez à l'automatique.")
+    @app_commands.describe(
+        mode="Choisissez un mode manuel ou revenez à l'automatique.",
+        raison="Raison optionnelle pour le changement de statut (s'affiche dans l'embed).",
+    )
     @app_commands.choices(
         mode=[
             app_commands.Choice(name="🟢 Online", value="online"),
@@ -396,16 +415,21 @@ class Statut(commands.Cog):
     )
     @commands.is_owner()
     async def set_status_slash(
-        self, interaction: discord.Interaction, mode: app_commands.Choice[str]
+        self,
+        interaction: discord.Interaction,
+        mode: app_commands.Choice[str],
+        raison: str | None = None,
     ) -> None:
         await interaction.response.defer(ephemeral=True)
 
         if mode.value == "automatique":
+            self._manual_reason = None
             if not self._automatic_check_task.is_running():
                 self._automatic_check_task.start()
                 log.info("Tâche de vérification automatique redémarrée.")
             await self._update_status_logic(interaction=interaction)
         else:
+            self._manual_reason = raison
             if self._automatic_check_task.is_running():
                 self._automatic_check_task.cancel()
                 log.info(
@@ -413,14 +437,8 @@ class Statut(commands.Cog):
                 )
 
             target_status = Status(mode.value)
-            if target_status == self._last_known_status:
-                await interaction.edit_original_response(
-                    content=f"Le bot est déjà en mode `{target_status.value}`."
-                )
-                return
-
             await self._update_status_logic(
-                interaction=interaction, forced_status=target_status
+                interaction=interaction, forced_status=target_status, reason=raison
             )
 
 
