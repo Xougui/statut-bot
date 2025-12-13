@@ -159,7 +159,7 @@ async def _call_gemini_api(prompt: str, schema: dict) -> dict | None:
         try:
             response = await asyncio.to_thread(
                 lambda: client.models.generate_content(
-                    model="gemini-1.5-flash",
+                    model=f"{PARAM.GEMINI_MODEL}",
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
