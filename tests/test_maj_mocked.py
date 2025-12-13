@@ -23,8 +23,8 @@ sys.modules["google"] = MagicMock()
 sys.modules["google.genai"] = MagicMock()
 sys.modules["google.genai.types"] = MagicMock()
 
-import cog.maj as maj_module  # to access client
-from cog.maj import (
+import cog.maj as maj_module  # to access client  # noqa: E402
+from cog.maj import (  # noqa: E402
     ManagementCog,
     UpdateManagerView,
     UpdateModal,
@@ -37,7 +37,7 @@ from cog.maj import (
 
 
 @pytest.fixture
-def mock_bot():
+def mock_bot() -> MagicMock:
     bot = MagicMock()
     bot.get_channel = MagicMock()
     return bot
@@ -254,7 +254,7 @@ async def test_update_manager_view_send_prod() -> None:
     en_channel = MagicMock()
     en_channel.name = "en-channel"
 
-    def get_channel(id):
+    def get_channel(id) -> MagicMock | None:
         if id == 201:
             return fr_channel
         if id == 202:
@@ -295,8 +295,8 @@ async def test_management_cog_patch_note(mock_bot) -> None:
     ):
         await cog.patch_note_command.callback(cog, interaction)
 
-        mock_send.call_count == 2
-        mock_ping.call_count == 2
+        assert mock_send.call_count == 2
+        assert mock_ping.call_count == 2
         interaction.followup.send.assert_called_with(
             "✅ Patch **1.0.1** annoncé.", ephemeral=True
         )
