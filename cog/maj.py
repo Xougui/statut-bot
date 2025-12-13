@@ -534,7 +534,7 @@ class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
             content="🎉 Prévisualisation envoyée ! Vérifiez le canal test."
         )
 
-    def _save_version(self):
+    def _save_version(self) -> None:
         try:
             with open("version.json", "w") as f:
                 json.dump({"version": self.version_number.value}, f, indent=2)
