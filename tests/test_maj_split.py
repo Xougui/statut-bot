@@ -1,5 +1,6 @@
 import sys
 from unittest.mock import AsyncMock, MagicMock, mock_open, patch
+
 import pytest
 
 # Mock PARAM
@@ -19,7 +20,8 @@ sys.modules["google"] = MagicMock()
 sys.modules["google.genai"] = MagicMock()
 sys.modules["google.genai.types"] = MagicMock()
 
-from cog.maj import UpdateModal, UpdateManagerView, _split_message
+from cog.maj import UpdateModal, _split_message
+
 
 @pytest.mark.asyncio
 async def test_split_message_logic() -> None:
@@ -37,7 +39,9 @@ async def test_split_message_logic() -> None:
     chunks_nl = _split_message(text_newline, limit=2000)
     assert len(chunks_nl) == 2
     assert chunks_nl[0] == "A" * 1000
-    assert chunks_nl[1] == "B" * 1000 # lstrip removes the newline if split happens there?
+    assert (
+        chunks_nl[1] == "B" * 1000
+    )  # lstrip removes the newline if split happens there?
     # Wait, implementation says:
     # split_index = rfind("\n")
     # chunks.append(content[:split_index]) -> includes up to before \n
@@ -60,7 +64,9 @@ async def test_update_modal_split_message() -> None:
         patch("builtins.open", mock_open(read_data='{"version": "1.0.0"}')),
         patch("json.dump"),
         patch("cog.maj._correct_french_text", new_callable=AsyncMock) as mock_correct,
-        patch("cog.maj._translate_to_english", new_callable=AsyncMock) as mock_translate,
+        patch(
+            "cog.maj._translate_to_english", new_callable=AsyncMock
+        ) as mock_translate,
     ):
         # Create a very long string
         long_text = "A" * 1500
