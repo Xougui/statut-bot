@@ -20,7 +20,7 @@ sys.modules["google"] = MagicMock()
 sys.modules["google.genai"] = MagicMock()
 sys.modules["google.genai.types"] = MagicMock()
 
-from cog.maj import UpdateModal, _split_message
+from cog.maj import UpdateModal, _split_message  # noqa: E402
 
 
 @pytest.mark.asyncio
@@ -42,11 +42,8 @@ async def test_split_message_logic() -> None:
     assert (
         chunks_nl[1] == "B" * 1000
     )  # lstrip removes the newline if split happens there?
-    # Wait, implementation says:
-    # split_index = rfind("\n")
-    # chunks.append(content[:split_index]) -> includes up to before \n
-    # content = content[split_index:].lstrip() -> includes \n and strips it
-    # So yes, chunks[1] should be B*1000 without leading \n
+    # Implementation splits at the last newline before the limit.
+    # The newline is stripped from the start of the next chunk.
 
 
 @pytest.mark.asyncio
