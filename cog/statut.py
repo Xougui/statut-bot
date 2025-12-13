@@ -400,12 +400,15 @@ class Statut(commands.Cog):
                         content="\n".join(progress_log)
                     )
 
-                if await self._send_ping(channel, target_status):
-                    if is_interactive and interaction:
-                        progress_log.append("🔔 Notification envoyée.")
-                        await interaction.edit_original_response(
-                            content="\n".join(progress_log)
-                        )
+                if (
+                    await self._send_ping(channel, target_status)
+                    and is_interactive
+                    and interaction
+                ):
+                    progress_log.append("🔔 Notification envoyée.")
+                    await interaction.edit_original_response(
+                        content="\n".join(progress_log)
+                    )
 
             self._last_known_status = target_status
 
