@@ -1,12 +1,7 @@
+import sys
+from unittest.mock import AsyncMock, MagicMock, mock_open, patch
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, mock_open
-import discord
-from discord.ext import commands
-import sys
-import json
-import io
-import asyncio
 
 # Mock PARAM and environment variables
 mock_param = MagicMock()
@@ -21,25 +16,25 @@ mock_param.crossmarck = "❌"
 mock_param.in_progress = "⏳"
 mock_param.annonce = "📢"
 mock_param.test = "🧪"
-sys.modules['PARAM'] = mock_param
+sys.modules["PARAM"] = mock_param
 
 # Mock google.genai
-sys.modules['google'] = MagicMock()
-sys.modules['google.genai'] = MagicMock()
-sys.modules['google.genai.types'] = MagicMock()
+sys.modules["google"] = MagicMock()
+sys.modules["google.genai"] = MagicMock()
+sys.modules["google.genai.types"] = MagicMock()
 
+import cog.maj as maj_module  # to access client
 from cog.maj import (
-    _ghost_ping,
-    _send_and_publish,
+    ManagementCog,
+    UpdateManagerView,
+    UpdateModal,
+    _build_message,
     _call_gemini_api,
     _correct_french_text,
-    _translate_to_english,
-    _build_message,
-    UpdateModal,
-    UpdateManagerView,
-    ManagementCog
+    _ghost_ping,
+    _send_and_publish,
 )
-import cog.maj as maj_module # to access client
+
 
 @pytest.fixture
 def mock_bot():
@@ -47,8 +42,9 @@ def mock_bot():
     bot.get_channel = MagicMock()
     return bot
 
+
 @pytest.mark.asyncio
-async def test_ghost_ping():
+async def test_ghost_ping() -> None:
     channel = AsyncMock()
     mention_msg = AsyncMock()
     channel.send.return_value = mention_msg
@@ -58,8 +54,9 @@ async def test_ghost_ping():
     channel.send.assert_called_with(f"<@&{mock_param.UPDATE_ROLE_ID}>")
     mention_msg.delete.assert_called_once()
 
+
 @pytest.mark.asyncio
-async def test_send_and_publish_normal_channel():
+async def test_send_and_publish_normal_channel() -> None:
     channel = AsyncMock()
     # Ensure is_news is treated as a method returning False, and NOT async
     channel.is_news = MagicMock(return_value=False)
@@ -76,8 +73,9 @@ async def test_send_and_publish_normal_channel():
 
     msg.add_reaction.assert_called_once()
 
+
 @pytest.mark.asyncio
-async def test_send_and_publish_news_channel():
+async def test_send_and_publish_news_channel() -> None:
     channel = AsyncMock()
     # Ensure is_news is treated as a method returning True, and NOT async
     channel.is_news = MagicMock(return_value=True)
@@ -89,8 +87,9 @@ async def test_send_and_publish_news_channel():
 
     msg.publish.assert_called_once()
 
+
 @pytest.mark.asyncio
-async def test_call_gemini_api_success():
+async def test_call_gemini_api_success() -> None:
     mock_response = MagicMock()
     mock_response.text = '{"key": "value"}'
 
@@ -101,8 +100,9 @@ async def test_call_gemini_api_success():
     result = await _call_gemini_api("prompt", {})
     assert result == {"key": "value"}
 
+
 @pytest.mark.asyncio
-async def test_call_gemini_api_failure_retry():
+async def test_call_gemini_api_failure_retry() -> None:
     # First call raises exception, second succeeds
     mock_response = MagicMock()
     mock_response.text = '{"success": true}'
@@ -110,27 +110,31 @@ async def test_call_gemini_api_failure_retry():
     maj_module.client.models.generate_content.reset_mock()
     maj_module.client.models.generate_content.side_effect = [
         Exception("API Error"),
-        mock_response
+        mock_response,
     ]
 
-    with patch('asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
+    with patch("asyncio.sleep", new_callable=AsyncMock):
         result = await _call_gemini_api("prompt", {})
         assert result == {"success": True}
         assert maj_module.client.models.generate_content.call_count == 2
 
+
 @pytest.mark.asyncio
-async def test_correct_french_text():
+async def test_correct_french_text() -> None:
     # Mock _call_gemini_api
-    with patch('cog.maj._call_gemini_api', new_callable=AsyncMock) as mock_api:
+    with patch("cog.maj._call_gemini_api", new_callable=AsyncMock) as mock_api:
         mock_api.return_value = {
             "corrected_title": "Titre Corrigé",
             "corrected_changes": "Changements Corrigés",
             "corrected_intro": "Intro Corrigée",
-            "corrected_outro": "Outro Corrigée"
+            "corrected_outro": "Outro Corrigée",
         }
 
         input_data = {
-            "title": "Titre", "changes": "Changements", "intro": "Intro", "outro": "Outro"
+            "title": "Titre",
+            "changes": "Changements",
+            "intro": "Intro",
+            "outro": "Outro",
         }
 
         result = await _correct_french_text(input_data)
@@ -138,13 +142,14 @@ async def test_correct_french_text():
         assert result["title"] == "Titre Corrigé"
         assert result["changes"] == "Changements Corrigés"
 
+
 @pytest.mark.asyncio
-async def test_build_message_french():
+async def test_build_message_french() -> None:
     texts = {
         "title": "My Update",
         "intro": "Intro text.",
         "changes": "& Added feature\n~ Removed bug\n£ In progress",
-        "outro": "Outro text."
+        "outro": "Outro text.",
     }
 
     msg = _build_message(texts, is_english=False)
@@ -156,13 +161,14 @@ async def test_build_message_french():
     assert "- ⏳: In progress" in msg
     assert "L'équipe de développement." in msg
 
+
 @pytest.mark.asyncio
-async def test_build_message_english():
+async def test_build_message_english() -> None:
     texts = {
         "title": "My Update",
         "intro": "Intro text.",
         "changes": "& Added feature",
-        "outro": "Outro text."
+        "outro": "Outro text.",
     }
 
     msg = _build_message(texts, is_english=True)
@@ -171,8 +177,9 @@ async def test_build_message_english():
     assert "- ✅ Added feature" in msg
     assert "The Development Team." in msg
 
+
 @pytest.mark.asyncio
-async def test_update_modal_submit():
+async def test_update_modal_submit() -> None:
     # Setup
     # Use AsyncMock for interaction, but we need guild attribute to be MagicMock to avoid async resolution
     interaction = AsyncMock()
@@ -185,13 +192,26 @@ async def test_update_modal_submit():
     interaction.original_response.return_value = followup
 
     # Mock open for version.json
-    with patch('builtins.open', mock_open(read_data='{"version": "1.0.0"}')) as mock_file, \
-         patch('json.dump') as mock_json_dump, \
-         patch('cog.maj._correct_french_text', new_callable=AsyncMock) as mock_correct, \
-         patch('cog.maj._translate_to_english', new_callable=AsyncMock) as mock_translate:
-
-        mock_correct.return_value = {"title": "FR Title", "changes": "FR Changes", "intro": "", "outro": ""}
-        mock_translate.return_value = {"title": "EN Title", "changes": "EN Changes", "intro": "", "outro": ""}
+    with (
+        patch("builtins.open", mock_open(read_data='{"version": "1.0.0"}')),
+        patch("json.dump") as mock_json_dump,
+        patch("cog.maj._correct_french_text", new_callable=AsyncMock) as mock_correct,
+        patch(
+            "cog.maj._translate_to_english", new_callable=AsyncMock
+        ) as mock_translate,
+    ):
+        mock_correct.return_value = {
+            "title": "FR Title",
+            "changes": "FR Changes",
+            "intro": "",
+            "outro": "",
+        }
+        mock_translate.return_value = {
+            "title": "EN Title",
+            "changes": "EN Changes",
+            "intro": "",
+            "outro": "",
+        }
 
         modal = UpdateModal(attachments=[])
 
@@ -207,19 +227,22 @@ async def test_update_modal_submit():
 
         # Assert
         interaction.response.send_message.assert_called_once()
-        mock_json_dump.assert_called() # Version saved
+        mock_json_dump.assert_called()  # Version saved
         mock_correct.assert_called_once()
         mock_translate.assert_called_once()
 
         # Verify test channel sending
-        interaction.guild.get_channel.assert_called_with(mock_param.UPDATE_CHANNEL_ID_TEST)
+        interaction.guild.get_channel.assert_called_with(
+            mock_param.UPDATE_CHANNEL_ID_TEST
+        )
         test_channel.send.assert_called_once()
-        args, kwargs = test_channel.send.call_args
-        assert kwargs['view'] is not None
-        assert isinstance(kwargs['view'], UpdateManagerView)
+        _args, kwargs = test_channel.send.call_args
+        assert kwargs["view"] is not None
+        assert isinstance(kwargs["view"], UpdateManagerView)
+
 
 @pytest.mark.asyncio
-async def test_update_manager_view_send_prod():
+async def test_update_manager_view_send_prod() -> None:
     fr_texts = {"title": "FR", "changes": "C", "intro": "I", "outro": "O"}
     en_texts = {"title": "EN", "changes": "C", "intro": "I", "outro": "O"}
     interaction = AsyncMock()
@@ -232,8 +255,10 @@ async def test_update_manager_view_send_prod():
     en_channel.name = "en-channel"
 
     def get_channel(id):
-        if id == 201: return fr_channel
-        if id == 202: return en_channel
+        if id == 201:
+            return fr_channel
+        if id == 202:
+            return en_channel
         return None
 
     # We need interaction.guild to be a MagicMock to allow side_effect on get_channel synchronously
@@ -241,30 +266,37 @@ async def test_update_manager_view_send_prod():
     interaction.guild.get_channel.side_effect = get_channel
 
     # Mock _send_and_publish and _ghost_ping
-    with patch('cog.maj._send_and_publish', new_callable=AsyncMock) as mock_send, \
-         patch('cog.maj._ghost_ping', new_callable=AsyncMock) as mock_ping:
-
+    with (
+        patch("cog.maj._send_and_publish", new_callable=AsyncMock) as mock_send,
+        patch("cog.maj._ghost_ping", new_callable=AsyncMock) as mock_ping,
+    ):
         # Mock button click
         callback = view.send_prod.callback
         await callback(interaction)
 
-        assert mock_send.call_count == 2 # FR and EN
-        assert mock_ping.call_count == 2 # FR and EN
-        interaction.followup.send.assert_called_with("✅ Mise à jour déployée en production !", ephemeral=True)
+        assert mock_send.call_count == 2  # FR and EN
+        assert mock_ping.call_count == 2  # FR and EN
+        interaction.followup.send.assert_called_with(
+            "✅ Mise à jour déployée en production !", ephemeral=True
+        )
+
 
 @pytest.mark.asyncio
-async def test_management_cog_patch_note(mock_bot):
+async def test_management_cog_patch_note(mock_bot) -> None:
     cog = ManagementCog(mock_bot)
     interaction = AsyncMock()
 
-    with patch('builtins.open', mock_open(read_data='{"version": "1.0.0"}')), \
-         patch('json.load', return_value={"version": "1.0.0"}), \
-         patch('json.dump'), \
-         patch('cog.maj._send_and_publish', new_callable=AsyncMock) as mock_send, \
-         patch('cog.maj._ghost_ping', new_callable=AsyncMock) as mock_ping:
-
+    with (
+        patch("builtins.open", mock_open(read_data='{"version": "1.0.0"}')),
+        patch("json.load", return_value={"version": "1.0.0"}),
+        patch("json.dump"),
+        patch("cog.maj._send_and_publish", new_callable=AsyncMock) as mock_send,
+        patch("cog.maj._ghost_ping", new_callable=AsyncMock) as mock_ping,
+    ):
         await cog.patch_note_command.callback(cog, interaction)
 
         mock_send.call_count == 2
         mock_ping.call_count == 2
-        interaction.followup.send.assert_called_with("✅ Patch **1.0.1** annoncé.", ephemeral=True)
+        interaction.followup.send.assert_called_with(
+            "✅ Patch **1.0.1** annoncé.", ephemeral=True
+        )
