@@ -1,13 +1,13 @@
 import asyncio
 import contextlib
 import datetime
-import logging
 from enum import Enum
+import logging
 
 import discord
-import pytz
 from discord import app_commands
 from discord.ext import commands, tasks
+import pytz
 
 import PARAM
 
@@ -35,6 +35,7 @@ PARIS_TZ = pytz.timezone("Europe/Paris")
 
 class Status(Enum):
     """Énumération pour les statuts possibles."""
+
     ONLINE = "online"
     OFFLINE = "offline"
     MAINTENANCE = "maintenance"
@@ -212,9 +213,7 @@ class Statut(commands.Cog):
             log.error(f"Erreur HTTP lors de l'envoi du log: {e}")
             return False
 
-    async def _send_ping(
-        self, channel: discord.TextChannel, status: Status
-    ) -> bool:
+    async def _send_ping(self, channel: discord.TextChannel, status: Status) -> bool:
         """Envoie un ping temporaire."""
         if status == Status.MAINTENANCE:
             return True
@@ -240,9 +239,9 @@ class Statut(commands.Cog):
     async def _get_target_status(self) -> Status | None:
         """Détermine le statut cible en fonction de l'état du bot surveillé."""
         # Si on surveille le bot lui-même
-        if BOT_ID == self.bot.user.id:
-             # On considère qu'il est ONLINE si le code tourne
-             # (Sauf si on implémente une logique spécifique)
+        if self.bot.user.id == BOT_ID:
+            # On considère qu'il est ONLINE si le code tourne
+            # (Sauf si on implémente une logique spécifique)
             return Status.ONLINE
 
         # Sinon on cherche le membre dans les serveurs communs
@@ -282,12 +281,10 @@ class Statut(commands.Cog):
                 progress_log.append(
                     f"⏳ **Mise à jour vers `{status_msg}` en cours...**"
                 )
-                try:
+                with contextlib.suppress(discord.InteractionResponded):
                     await interaction.edit_original_response(
                         content="\n".join(progress_log)
                     )
-                except discord.InteractionResponded:
-                    pass
 
             # 1. Déterminer le statut cible
             is_manual = forced_status is not None
@@ -299,16 +296,22 @@ class Statut(commands.Cog):
                     # On n'a pas pu déterminer le statut cible (bot introuvable)
                     # On garde l'ancien ou on ne fait rien
                     if is_interactive and interaction:
-                         await interaction.followup.send("⚠️ Impossible de trouver le bot cible.", ephemeral=True)
+                        await interaction.followup.send(
+                            "⚠️ Impossible de trouver le bot cible.", ephemeral=True
+                        )
                     return
                 target_status = target_status_detected
 
             # 2. Récupérer les indicateurs visuels
             channel = self.bot.get_channel(CHANNEL_ID)
             if not channel or not isinstance(channel, discord.TextChannel):
-                log.error(f"Salon de statut (ID: {CHANNEL_ID}) introuvable ou invalide.")
+                log.error(
+                    f"Salon de statut (ID: {CHANNEL_ID}) introuvable ou invalide."
+                )
                 if is_interactive and interaction:
-                    await interaction.followup.send("❌ Salon de statut introuvable.", ephemeral=True)
+                    await interaction.followup.send(
+                        "❌ Salon de statut introuvable.", ephemeral=True
+                    )
                 return
 
             try:
@@ -386,15 +389,20 @@ class Statut(commands.Cog):
             ):
                 logs_channel = self.bot.get_channel(LOGS_CHANNEL_ID)
                 if isinstance(logs_channel, discord.TextChannel):
-                    if await self._send_log(logs_channel, target_status, manual=is_manual, reason=reason):
-                         if is_interactive and interaction:
-                            progress_log.append("📄 Message de log envoyé.")
-                            await interaction.edit_original_response(content="\n".join(progress_log))
+                    if await self._send_log(
+                        logs_channel, target_status, manual=is_manual, reason=reason
+                    ) and is_interactive and interaction:
+                        progress_log.append("📄 Message de log envoyé.")
+                        await interaction.edit_original_response(
+                            content="\n".join(progress_log)
+                        )
 
                 if await self._send_ping(channel, target_status):
-                     if is_interactive and interaction:
+                    if is_interactive and interaction:
                         progress_log.append("🔔 Notification envoyée.")
-                        await interaction.edit_original_response(content="\n".join(progress_log))
+                        await interaction.edit_original_response(
+                            content="\n".join(progress_log)
+                        )
 
             self._last_known_status = target_status
 
