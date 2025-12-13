@@ -1,22 +1,18 @@
-
-import pytest
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
-import discord
-from discord.ext import tasks
-
 # We need to import the module to patch it, but we need to mock PARAM first
 # or PARAM needs to be available.
 # Since PARAM is imported at top level in cog/statut.py, we need to patch it before import
 # or relying on the fact that we can patch 'cog.statut.PARAM' after import if we are careful.
-
 # However, cog/statut.py does:
 # BOT_ID = PARAM.BOT_ID
 # So updating PARAM after import won't change BOT_ID in statut.py
 # We must patch sys.modules or use patch.dict on os.environ if it used env vars, but it uses PARAM.
-
 # Strategy: Mock PARAM completely before importing cog.statut
 import sys
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import discord
+import pytest
+
 mock_param = MagicMock()
 mock_param.BOT_ID = 123
 mock_param.CHANNEL_ID = 456
@@ -26,9 +22,10 @@ mock_param.ROLE_ID = 102
 mock_param.offline = "🔴"
 mock_param.online = "🟢"
 mock_param.maintenance = "🔵"
-sys.modules['PARAM'] = mock_param
+sys.modules["PARAM"] = mock_param
 
-from cog.statut import Statut, Status
+from cog.statut import Status, Statut
+
 
 @pytest.fixture
 def mock_bot():
@@ -39,16 +36,18 @@ def mock_bot():
     bot.guilds = []
     return bot
 
+
 @pytest.fixture
 def statut_cog(mock_bot):
     # Prevent the task from starting automatically during init
-    with patch('discord.ext.tasks.Loop.start') as mock_start:
+    with patch("discord.ext.tasks.Loop.start") as mock_start:
         cog = Statut(mock_bot)
         # Verify start was called
         mock_start.assert_called_once()
         return cog
 
-def test_get_status_from_embed(statut_cog):
+
+def test_get_status_from_embed(statut_cog) -> None:
     embed_online = MagicMock(title="🟢・**Bot en ligne**")
     assert statut_cog._get_status_from_embed(embed_online) == Status.ONLINE
 
@@ -60,7 +59,8 @@ def test_get_status_from_embed(statut_cog):
 
     assert statut_cog._get_status_from_embed(None) is None
 
-def test_get_status_from_channel_name(statut_cog):
+
+def test_get_status_from_channel_name(statut_cog) -> None:
     channel = MagicMock()
     channel.name = "═🟢・online"
     assert statut_cog._get_status_from_channel_name(channel) == Status.ONLINE
@@ -73,24 +73,28 @@ def test_get_status_from_channel_name(statut_cog):
 
     assert statut_cog._get_status_from_channel_name(None) is None
 
+
 @pytest.mark.asyncio
-async def test_update_embed(statut_cog):
+async def test_update_embed(statut_cog) -> None:
     message = AsyncMock()
 
     # Test ONLINE
     assert await statut_cog._update_embed(message, Status.ONLINE) is True
-    assert message.edit.call_args[1]['embed'].color.value == 0x00BF63
+    assert message.edit.call_args[1]["embed"].color.value == 0x00BF63
 
     # Test OFFLINE
     assert await statut_cog._update_embed(message, Status.OFFLINE) is True
-    assert message.edit.call_args[1]['embed'].color.value == 0xFF3131
+    assert message.edit.call_args[1]["embed"].color.value == 0xFF3131
 
     # Test Exception
-    message.edit.side_effect = discord.HTTPException(response=MagicMock(), message="Error")
+    message.edit.side_effect = discord.HTTPException(
+        response=MagicMock(), message="Error"
+    )
     assert await statut_cog._update_embed(message, Status.ONLINE) is False
 
+
 @pytest.mark.asyncio
-async def test_update_channel_name(statut_cog):
+async def test_update_channel_name(statut_cog) -> None:
     channel = AsyncMock()
     channel.name = "old_name"
 
@@ -111,11 +115,14 @@ async def test_update_channel_name(statut_cog):
     channel.name = "old_name"
     response = MagicMock()
     response.status = 403
-    channel.edit.side_effect = discord.HTTPException(response=response, message="Forbidden")
+    channel.edit.side_effect = discord.HTTPException(
+        response=response, message="Forbidden"
+    )
     assert await statut_cog._update_channel_name(channel, Status.ONLINE) is False
 
+
 @pytest.mark.asyncio
-async def test_update_status_logic_manual(statut_cog):
+async def test_update_status_logic_manual(statut_cog) -> None:
     interaction = AsyncMock()
     interaction.edit_original_response = AsyncMock()
 
@@ -137,7 +144,9 @@ async def test_update_status_logic_manual(statut_cog):
     statut_cog._last_known_status = Status.OFFLINE
 
     # Run
-    await statut_cog._update_status_logic(interaction=interaction, forced_status=Status.ONLINE)
+    await statut_cog._update_status_logic(
+        interaction=interaction, forced_status=Status.ONLINE
+    )
 
     statut_cog._update_embed.assert_called_once()
     statut_cog._update_channel_name.assert_called_once()
@@ -145,8 +154,9 @@ async def test_update_status_logic_manual(statut_cog):
     statut_cog._send_ping.assert_called_once()
     assert statut_cog._last_known_status == Status.ONLINE
 
+
 @pytest.mark.asyncio
-async def test_update_status_logic_automatic_no_change(statut_cog):
+async def test_update_status_logic_automatic_no_change(statut_cog) -> None:
     # Setup target bot is online
     target_bot = MagicMock()
     target_bot.status = discord.Status.online
@@ -172,8 +182,9 @@ async def test_update_status_logic_automatic_no_change(statut_cog):
     statut_cog._update_embed.assert_not_called()
     statut_cog._update_channel_name.assert_not_called()
 
+
 @pytest.mark.asyncio
-async def test_update_status_logic_automatic_change(statut_cog):
+async def test_update_status_logic_automatic_change(statut_cog) -> None:
     # Setup target bot is OFFLINE
     target_bot = MagicMock()
     target_bot.status = discord.Status.offline

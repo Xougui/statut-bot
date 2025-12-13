@@ -87,7 +87,7 @@ def is_owner(ctx):  # N802: Function name `isOwner` should be lowercase
 
 @bot.command()
 @commands.check(is_owner)
-async def start(ctx, secondes=3):
+async def start(ctx, secondes=3) -> None:
     change_status.change_interval(seconds=secondes)
 
 
@@ -95,7 +95,7 @@ status_index = 0
 
 
 @tasks.loop(seconds=5)
-async def change_status():
+async def change_status() -> None:
     global status_index
     target_bot = bot.get_user(BOT_ID)
     statuses = [
@@ -442,7 +442,7 @@ async def sync(interaction: discord.Interaction) -> None:
 # ----------------------------------------------------------------------------------------------------------------
 
 
-def run_flask_server():
+def run_flask_server() -> None:
     flask_app = Flask(__name__)
 
     log = logging.getLogger("werkzeug")
@@ -459,7 +459,7 @@ def run_flask_server():
 
 
 @bot.event
-async def on_ready():
+async def on_ready() -> None:
     """
     Fonction on_ready principale du bot.
     Elle est appelée une fois que le bot est connecté à Discord.
@@ -505,7 +505,7 @@ async def on_ready():
 # --- Chargement des Cogs au démarrage ---
 # Cette partie est exécutée avant que bot.run() ne bloque le thread
 # et avant que l'événement on_ready ne soit déclenché par Discord.
-async def main():
+async def main() -> None:
     # Charger les cogs
     for extension in EXTENSIONS:
         try:
