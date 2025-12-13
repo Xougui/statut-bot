@@ -51,7 +51,9 @@ def _split_message(content: str, limit: int = 2000) -> list[str]:
             split_index = limit
 
         chunks.append(content[:split_index])
-        content = content[split_index:].lstrip()  # On retire les espaces/sauts de ligne au début du morceau suivant
+        content = content[
+            split_index:
+        ].lstrip()  # On retire les espaces/sauts de ligne au début du morceau suivant
 
     return chunks
 
@@ -109,13 +111,17 @@ async def _send_and_publish(
             if channel.is_news():
                 try:
                     await msg.publish()
-                    logging.info(f"Message publié dans le canal d'annonces {channel.name}.")
+                    logging.info(
+                        f"Message publié dans le canal d'annonces {channel.name}."
+                    )
                 except discord.Forbidden:
                     logging.error(
                         f"Permissions insuffisantes pour publier dans {channel.name}."
                     )
                 except Exception as e:
-                    logging.error(f"Erreur lors de la publication dans {channel.name}: {e}")
+                    logging.error(
+                        f"Erreur lors de la publication dans {channel.name}: {e}"
+                    )
 
             try:
                 verify_emoji = discord.PartialEmoji(
@@ -420,17 +426,17 @@ class UpdateManagerView(ui.View):
         channel = interaction.channel
         if not channel:
             # Fallback (peu probable)
-            await interaction.followup.send("❌ Erreur: Canal introuvable pour le rafraîchissement.", ephemeral=True)
+            await interaction.followup.send(
+                "❌ Erreur: Canal introuvable pour le rafraîchissement.", ephemeral=True
+            )
             return
 
         for i, chunk in enumerate(chunks):
-            is_last = (i == len(chunks) - 1)
+            is_last = i == len(chunks) - 1
             current_view = self if is_last else None
             current_files = get_files() if is_last else None
 
-            await channel.send(
-                content=chunk, files=current_files, view=current_view
-            )
+            await channel.send(content=chunk, files=current_files, view=current_view)
 
     @ui.button(label="Envoyer Production", style=discord.ButtonStyle.green)
     async def send_prod(
@@ -589,7 +595,7 @@ class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
 
         for i, chunk in enumerate(chunks):
             # On attache la vue et les fichiers uniquement au dernier message
-            is_last = (i == len(chunks) - 1)
+            is_last = i == len(chunks) - 1
             current_view = view if is_last else None
             current_files = files_objects if is_last else None
 
