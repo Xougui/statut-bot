@@ -249,23 +249,23 @@ def _build_message(texts: dict, is_english: bool) -> str:
 
     if is_english:
         changes = (
-            changes.replace("&", PARAM.checkmark)
-            .replace("~", PARAM.crossmarck)
-            .replace("£", PARAM.in_progress)
+            changes.replace("&", f"- {PARAM.checkmark}")
+            .replace("~", f"- {PARAM.crossmarck}")
+            .replace("£", f"- {PARAM.in_progress}")
         )
         greeting = "👋 Hello to the entire community!\n\n"
-        user_update_msg = f"{PARAM.test} <@{PARAM.BOT_ID}> received an update !\n\n"
+        user_update_msg = f"<@{PARAM.BOT_ID}> received an update ! {PARAM.test}\n\n"
         conclusion_text = "Stay tuned for future announcements and thank you for your continued support!"
         team_signature = "The Development Team."
         feedback_prompt = "Use /feedback to report any mistakes or bugs or go to <#1350399062418915418>."
     else:
         changes = (
-            changes.replace("&", f"{PARAM.checkmark}:")
-            .replace("~", f"{PARAM.crossmarck}:")
-            .replace("£", f"{PARAM.in_progress}:")
+            changes.replace("&", f"- {PARAM.checkmark}:")
+            .replace("~", f"- {PARAM.crossmarck}:")
+            .replace("£", f"- {PARAM.in_progress}:")
         )
         greeting = "👋 Coucou à toute la communauté !\n\n"
-        user_update_msg = f"{PARAM.test} <@{PARAM.BOT_ID}> a reçu une mise à jour !\n\n"
+        user_update_msg = f"<@{PARAM.BOT_ID}> a reçu une mise à jour ! {PARAM.test}\n\n"
         conclusion_text = "Restez connectés pour de futures annonces et merci pour votre soutien continu !"
         team_signature = "L'équipe de développement."
         feedback_prompt = "Utilisez /feedback pour signaler des erreurs ou des bugs ou allez dans <#1350399062418915418>."
@@ -283,7 +283,9 @@ def _build_message(texts: dict, is_english: bool) -> str:
 class EditUpdateModal(ui.Modal):
     """Modal pour éditer le texte de la mise à jour (FR ou EN)."""
 
-    def __init__(self, texts: dict, is_english: bool, view: "UpdateManagerView") -> None:
+    def __init__(
+        self, texts: dict, is_english: bool, view: "UpdateManagerView"
+    ) -> None:
         title = "Éditer texte (Anglais)" if is_english else "Éditer texte (Français)"
         super().__init__(title=title)
         self.texts = texts
@@ -372,7 +374,9 @@ class UpdateManagerView(ui.View):
             )
 
     @ui.button(label="Envoyer Production", style=discord.ButtonStyle.green)
-    async def send_prod(self, interaction: discord.Interaction, button: ui.Button) -> None:
+    async def send_prod(
+        self, interaction: discord.Interaction, button: ui.Button
+    ) -> None:
         await interaction.response.defer()
 
         # Disable buttons to prevent double click
@@ -394,10 +398,12 @@ class UpdateManagerView(ui.View):
         await _send_and_publish(fr_channel, french_message, files_fr)
         await _ghost_ping(fr_channel)
 
-        # Re-create files for EN (or send without files as before?)
-        # The original code said: # On ne re-upload pas les fichiers pour le 2ème message
-        # So we send EN without files.
-        await _send_and_publish(en_channel, english_message, None)
+        # Re-create files for EN
+        files_en = []
+        for filename, file_bytes in self.files_data:
+            files_en.append(discord.File(io.BytesIO(file_bytes), filename=filename))
+
+        await _send_and_publish(en_channel, english_message, files_en)
         await _ghost_ping(en_channel)
 
         await interaction.followup.send(
@@ -405,13 +411,17 @@ class UpdateManagerView(ui.View):
         )
 
     @ui.button(label="Éditer FR", style=discord.ButtonStyle.blurple)
-    async def edit_fr(self, interaction: discord.Interaction, button: ui.Button) -> None:
+    async def edit_fr(
+        self, interaction: discord.Interaction, button: ui.Button
+    ) -> None:
         await interaction.response.send_modal(
             EditUpdateModal(self.fr_texts, is_english=False, view=self)
         )
 
     @ui.button(label="Éditer EN", style=discord.ButtonStyle.blurple)
-    async def edit_en(self, interaction: discord.Interaction, button: ui.Button) -> None:
+    async def edit_en(
+        self, interaction: discord.Interaction, button: ui.Button
+    ) -> None:
         await interaction.response.send_modal(
             EditUpdateModal(self.en_texts, is_english=True, view=self)
         )
@@ -433,6 +443,7 @@ class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
     def __init__(self, attachments: list[discord.Attachment]) -> None:
         super().__init__()
         self.attachments = attachments
+        self.api_url_gemini = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key={gemini_api_key}"
         try:
             with open("version.json") as f:
                 self.version_number.default = json.load(f).get("version", "1.0.0")
@@ -522,7 +533,6 @@ class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
         await test_channel.send(
             content=full_test_message, files=files_objects, view=view
         )
-        await _ghost_ping(test_channel)
 
         await followup_message.edit(
             content="🎉 Prévisualisation envoyée ! Vérifiez le canal test."
