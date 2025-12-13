@@ -388,18 +388,17 @@ class Statut(commands.Cog):
                 is_manual and target_status != self._last_known_status
             ):
                 logs_channel = self.bot.get_channel(LOGS_CHANNEL_ID)
-                if isinstance(logs_channel, discord.TextChannel):
-                    if (
-                        await self._send_log(
-                            logs_channel, target_status, manual=is_manual, reason=reason
-                        )
-                        and is_interactive
-                        and interaction
-                    ):
-                        progress_log.append("📄 Message de log envoyé.")
-                        await interaction.edit_original_response(
-                            content="\n".join(progress_log)
-                        )
+                if isinstance(logs_channel, discord.TextChannel) and (
+                    await self._send_log(
+                        logs_channel, target_status, manual=is_manual, reason=reason
+                    )
+                    and is_interactive
+                    and interaction
+                ):
+                    progress_log.append("📄 Message de log envoyé.")
+                    await interaction.edit_original_response(
+                        content="\n".join(progress_log)
+                    )
 
                 if await self._send_ping(channel, target_status):
                     if is_interactive and interaction:
