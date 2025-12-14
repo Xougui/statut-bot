@@ -133,9 +133,9 @@ class Statut(commands.Cog):
     ) -> bool:
         """Met à jour le nom du salon."""
         name_map = {
-            Status.ONLINE: "═🟢・online",
-            Status.OFFLINE: "═🔴・offline",
-            Status.MAINTENANCE: "═🔵・maintenance",
+            Status.ONLINE: "🟢・online",
+            Status.OFFLINE: "🔴・offline",
+            Status.MAINTENANCE: "🔵・maintenance",
         }
         new_name = name_map.get(status)
         if not new_name or channel.name == new_name:
