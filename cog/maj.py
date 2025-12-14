@@ -287,7 +287,6 @@ def _build_message(texts: dict, is_english: bool) -> str:
             .replace("~", f"- {PARAM.crossmarck}")
             .replace("£", f"- {PARAM.in_progress}")
         )
-        greeting = "👋 Hello to the entire community!\n\n"
         user_update_msg = f"<@{PARAM.BOT_ID}> received an update ! {PARAM.test}\n\n"
         conclusion_text = "Stay tuned for future announcements and thank you for your continued support!"
         team_signature = "The Development Team."
@@ -298,13 +297,12 @@ def _build_message(texts: dict, is_english: bool) -> str:
             .replace("~", f"- {PARAM.crossmarck}:")
             .replace("£", f"- {PARAM.in_progress}:")
         )
-        greeting = "👋 Coucou à toute la communauté !\n\n"
         user_update_msg = f"<@{PARAM.BOT_ID}> a reçu une mise à jour ! {PARAM.test}\n\n"
         conclusion_text = "Restez connectés pour de futures annonces et merci pour votre soutien continu !"
         team_signature = "L'équipe de développement."
         feedback_prompt = "Utilisez /feedback pour signaler des erreurs ou des bugs ou allez dans <#1350399062418915418>."
 
-    parts = [f"# {PARAM.annonce} {title} {PARAM.annonce}\n\n", greeting]
+    parts = [f"# {PARAM.annonce} {title} {PARAM.annonce}\n\n"]
     if intro:
         parts.append(f"{intro}\n\n")
     parts.extend([user_update_msg, f"{changes}\n\n"])
