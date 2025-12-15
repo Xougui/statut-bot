@@ -41,6 +41,22 @@ class Status(Enum):
     MAINTENANCE = "maintenance"
 
 
+def is_owner():
+    """
+    Vérifie si l'utilisateur qui exécute la commande est un propriétaire défini dans PARAM.owners.
+    """
+
+    async def predicate(interaction: discord.Interaction) -> bool:
+        if interaction.user.id not in PARAM.owners:
+            await interaction.response.send_message(
+                "Vous n'êtes pas autorisé à utiliser cette commande.", ephemeral=True
+            )
+            return False
+        return True
+
+    return app_commands.check(predicate)
+
+
 class Statut(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
@@ -454,7 +470,7 @@ class Statut(commands.Cog):
             app_commands.Choice(name="🤖 Automatique", value="automatique"),
         ]
     )
-    @commands.is_owner()
+    @is_owner()
     async def set_status_slash(
         self,
         interaction: discord.Interaction,
