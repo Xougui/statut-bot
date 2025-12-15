@@ -29,8 +29,8 @@ Avant d'installer le bot, assurez-vous d'avoir les éléments suivants :
     *   Allez sur le [Portail des Développeurs Discord](https://discord.com/developers/applications).
     *   Créez une "New Application", puis allez dans l'onglet **Bot**.
     *   Cliquez sur **Reset Token** et copiez ce token (gardez-le secret !).
-    > [!IMPORTANT]
-    > *   Dans la section "Privileged Gateway Intents" (juste en dessous), activez **PRESENCE INTENT**, **SERVER MEMBERS INTENT** et **MESSAGE CONTENT INTENT**. Sans ça, le bot ne verra rien !
+> [!IMPORTANT]
+> *   Dans la section "Privileged Gateway Intents" (juste en dessous), activez **PRESENCE INTENT**, **SERVER MEMBERS INTENT** et **MESSAGE CONTENT INTENT**. Sans ça, le bot ne verra rien !
 
 3.  **Une Clé API Google Gemini** (pour les annonces de mise à jour) :
     *   Allez sur [Google AI Studio](https://aistudio.google.com/app/apikey).
