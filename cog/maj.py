@@ -510,7 +510,7 @@ class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
         super().__init__()
         self.attachments = attachments
         try:
-            with open("version.json") as f:
+            with open("data/version.json") as f:
                 self.version_number.default = json.load(f).get("version", "1.0.0")
         except (FileNotFoundError, json.JSONDecodeError):
             self.version_number.default = "1.0.0"
@@ -615,7 +615,7 @@ class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
 
     def _save_version(self) -> None:
         try:
-            with open("version.json", "w") as f:
+            with open("data/version.json", "w") as f:
                 json.dump({"version": self.version_number.value}, f, indent=2)
             logging.info(f"Version mise à jour vers : {self.version_number.value}")
         except OSError as e:
