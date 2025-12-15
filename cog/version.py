@@ -1,3 +1,4 @@
+from collections.abc import Callable
 import json
 import logging
 import re
@@ -14,7 +15,7 @@ logging.basicConfig(
 )
 
 
-def is_owner():
+def is_owner() -> Callable:
     """
     Vérifie si l'utilisateur qui exécute la commande est un propriétaire défini dans PARAM.owners.
     """
