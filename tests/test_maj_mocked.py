@@ -30,8 +30,8 @@ from cog.maj import (  # noqa: E402
     _build_message,
     _call_gemini_api,
     _correct_french_text,
-    _ghost_ping,
     _send_and_publish,
+    _send_ping,
 )
 
 
@@ -43,15 +43,12 @@ def mock_bot() -> MagicMock:
 
 
 @pytest.mark.asyncio
-async def test_ghost_ping() -> None:
+async def test_send_ping() -> None:
     channel = AsyncMock()
-    mention_msg = AsyncMock()
-    channel.send.return_value = mention_msg
 
-    await _ghost_ping(channel)
+    await _send_ping(channel)
 
     channel.send.assert_called_with(f"<@&{mock_param.UPDATE_ROLE_ID}>")
-    mention_msg.delete.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -267,7 +264,7 @@ async def test_update_manager_view_send_prod() -> None:
     # Mock _send_and_publish and _ghost_ping
     with (
         patch("cog.maj._send_and_publish", new_callable=AsyncMock) as mock_send,
-        patch("cog.maj._ghost_ping", new_callable=AsyncMock) as mock_ping,
+        patch("cog.maj._send_ping", new_callable=AsyncMock) as mock_ping,
     ):
         # Mock button click
         callback = view.send_prod.callback
