@@ -154,7 +154,7 @@ async def test_build_message_french() -> None:
     msg = _build_message(texts, is_english=False)
 
     assert "# 📢 My Update 📢" in msg
-    assert "Coucou à toute la communauté !" in msg
+    assert "<@999> a reçu une mise à jour ! 🧪" in msg
     assert "- ✅: Added feature" in msg
     assert "- ❌: Removed bug" in msg
     assert "- ⏳: In progress" in msg
@@ -172,7 +172,7 @@ async def test_build_message_english() -> None:
 
     msg = _build_message(texts, is_english=True)
 
-    assert "Hello to the entire community!" in msg
+    assert "<@999> received an update ! 🧪" in msg
     assert "- ✅ Added feature" in msg
     assert "The Development Team." in msg
 
