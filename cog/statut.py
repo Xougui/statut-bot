@@ -3,8 +3,8 @@ from collections.abc import Callable
 import contextlib
 import datetime
 from enum import Enum
-import logging
 import json
+import logging
 import os
 
 import discord
@@ -78,7 +78,7 @@ class Statut(commands.Cog):
         """Charge l'ID du message depuis le fichier JSON."""
         if os.path.exists(DATA_FILE):
             try:
-                with open(DATA_FILE, "r", encoding="utf-8") as f:
+                with open(DATA_FILE, encoding="utf-8") as f:
                     data = json.load(f)
                     self._message_id = data.get("message_id")
             except Exception as e:
@@ -127,10 +127,11 @@ class Statut(commands.Cog):
 
     # --- Fonctions de mise à jour de bas niveau ---
 
-    async def _create_status_message(self, channel: discord.TextChannel) -> discord.Message | None:
+    async def _create_status_message(
+        self, channel: discord.TextChannel
+    ) -> discord.Message | None:
         """Crée un nouveau message de statut."""
         # On initialise avec un statut 'offline' par défaut pour commencer proprement
-        initial_status = Status.OFFLINE
         embed = discord.Embed(
             title=f"{OFFLINE_EMOJI}・**Bot hors ligne**",
             description="Le bot **Lyxios** est **hors ligne**.\n\n> Ne vous inquiétez pas, le bot reviendra en ligne !\n> Check ça pour savoir si le bot est `online` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi\n-# Merci de votre patience.",
@@ -382,15 +383,20 @@ class Statut(commands.Cog):
                 try:
                     message = await channel.fetch_message(self._message_id)
                 except (discord.NotFound, discord.Forbidden):
-                    log.warning(f"Message de statut (ID: {self._message_id}) introuvable. Création d'un nouveau...")
+                    log.warning(
+                        f"Message de statut (ID: {self._message_id}) introuvable. Création d'un nouveau..."
+                    )
                     message = None
 
             if not message:
                 message = await self._create_status_message(channel)
                 if not message:
-                     if is_interactive and interaction:
-                        await interaction.followup.send("❌ Impossible de créer le message de statut.", ephemeral=True)
-                     return
+                    if is_interactive and interaction:
+                        await interaction.followup.send(
+                            "❌ Impossible de créer le message de statut.",
+                            ephemeral=True,
+                        )
+                    return
 
             embed_status = self._get_status_from_embed(
                 message.embeds[0] if message.embeds else None
@@ -490,32 +496,43 @@ class Statut(commands.Cog):
         # Check Channel
         channel = self.bot.get_channel(CHANNEL_ID)
         if not channel:
-            log.error(f"❌ CHANNEL_ID invalide: Impossible de trouver le salon avec l'ID {CHANNEL_ID}.")
+            log.error(
+                f"❌ CHANNEL_ID invalide: Impossible de trouver le salon avec l'ID {CHANNEL_ID}."
+            )
         elif not isinstance(channel, discord.TextChannel):
-            log.error(f"❌ CHANNEL_ID invalide: L'ID {CHANNEL_ID} ne correspond pas à un salon textuel.")
+            log.error(
+                f"❌ CHANNEL_ID invalide: L'ID {CHANNEL_ID} ne correspond pas à un salon textuel."
+            )
         else:
             log.info(f"✅ CHANNEL_ID valide: {channel.name} ({channel.guild.name})")
 
             # Check Role (dependant on channel guild)
             role = channel.guild.get_role(PING_ROLE_ID)
             if not role:
-                 log.warning(f"⚠️ ROLE_ID introuvable: Le rôle avec l'ID {PING_ROLE_ID} n'existe pas dans le serveur {channel.guild.name}.")
+                log.warning(
+                    f"⚠️ ROLE_ID introuvable: Le rôle avec l'ID {PING_ROLE_ID} n'existe pas dans le serveur {channel.guild.name}."
+                )
             else:
-                 log.info(f"✅ ROLE_ID valide: {role.name}")
+                log.info(f"✅ ROLE_ID valide: {role.name}")
 
         # Check Logs Channel
         logs_channel = self.bot.get_channel(LOGS_CHANNEL_ID)
         if not logs_channel:
-            log.warning(f"⚠️ LOGS_CHANNEL_ID introuvable: Impossible de trouver le salon avec l'ID {LOGS_CHANNEL_ID}.")
+            log.warning(
+                f"⚠️ LOGS_CHANNEL_ID introuvable: Impossible de trouver le salon avec l'ID {LOGS_CHANNEL_ID}."
+            )
         elif not isinstance(logs_channel, discord.TextChannel):
-            log.warning(f"⚠️ LOGS_CHANNEL_ID invalide: L'ID {LOGS_CHANNEL_ID} ne correspond pas à un salon textuel.")
+            log.warning(
+                f"⚠️ LOGS_CHANNEL_ID invalide: L'ID {LOGS_CHANNEL_ID} ne correspond pas à un salon textuel."
+            )
         else:
-            log.info(f"✅ LOGS_CHANNEL_ID valide: {logs_channel.name} ({logs_channel.guild.name})")
+            log.info(
+                f"✅ LOGS_CHANNEL_ID valide: {logs_channel.name} ({logs_channel.guild.name})"
+            )
 
         # Check Bot ID
-        target_member = None
         if self.bot.user.id == BOT_ID:
-             log.info(f"✅ BOT_ID valide: Le bot se surveille lui-même.")
+            log.info("✅ BOT_ID valide: Le bot se surveille lui-même.")
         else:
             found = False
             for guild in self.bot.guilds:
@@ -523,9 +540,13 @@ class Statut(commands.Cog):
                     found = True
                     break
             if found:
-                log.info(f"✅ BOT_ID valide: Bot cible trouvé dans les serveurs communs.")
+                log.info(
+                    "✅ BOT_ID valide: Bot cible trouvé dans les serveurs communs."
+                )
             else:
-                log.warning(f"⚠️ BOT_ID introuvable: Impossible de trouver le membre avec l'ID {BOT_ID} dans les serveurs communs.")
+                log.warning(
+                    f"⚠️ BOT_ID introuvable: Impossible de trouver le membre avec l'ID {BOT_ID} dans les serveurs communs."
+                )
 
     @_automatic_check_task.before_loop
     async def before_check(self) -> None:
