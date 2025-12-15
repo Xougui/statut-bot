@@ -30,7 +30,7 @@ Avant d'installer le bot, assurez-vous d'avoir les éléments suivants :
 2.  **Un Bot Discord** :
     *   Allez sur le [Portail des Développeurs Discord](https://discord.com/developers/applications).
     *   Créez une "New Application", puis allez dans l'onglet **Bot**.
-    *   Cliquez sur **Reset Token** et copiez ce token (gardez-le secret !).
+    *   Cliquez sur **Reset Token** et copiez ce token (**gardez-le secret !**).
 > [!IMPORTANT]
 > *   Dans la section "Privileged Gateway Intents" (juste en dessous), activez **PRESENCE INTENT**, **SERVER MEMBERS INTENT** et **MESSAGE CONTENT INTENT**. Sans ça, le bot ne verra rien !
 
