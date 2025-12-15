@@ -159,6 +159,10 @@ async def _send_and_publish(
 
 async def _call_gemini_api(prompt: str, schema: dict) -> dict | None:
     """Appelle l'API Gemini avec une nouvelle tentative en cas d'échec."""
+    if not client:
+        logging.error("Client Gemini non initialisé (Clé API manquante ?).")
+        return None
+
     max_retries = 3
     for attempt in range(max_retries):
         try:
