@@ -99,7 +99,8 @@ Explications des variables dans `PARAM.py` :
 *   `LOGS_CHANNEL_ID` : L'ID d'un salon privé où le bot enverra l'historique des changements (Logs).
 *   `ROLE_ID` : L'ID du rôle à mentionner ("ping") quand le bot surveillé tombe en panne.
 
-*Note : Le bot créera automatiquement un fichier `data/statut.json` pour se souvenir de l'ID du message de statut. Si vous supprimez le message sur Discord, le bot en créera un nouveau automatiquement.*
+> [!NOTE]
+> Le bot créera automatiquement un fichier `data/statut.json` pour se souvenir de l'ID du message de statut. Si vous supprimez le message sur Discord, le bot en créera un nouveau automatiquement.*
 
 ---
 
