@@ -329,7 +329,7 @@ class PatchNoteView(ui.View):
 
         # Update version file
         try:
-            with open("version.json", "w") as f:
+            with open("data/version.json", "w") as f:
                 json.dump({"version": self.new_version}, f, indent=2)
             logging.info(f"Version sauvegardée : {self.new_version}")
         except Exception as e:
@@ -399,7 +399,7 @@ class PatchNoteModal(ui.Modal, title="Déployer un Patch"):
         self.current_version = "1.0.0"
         self.next_version = "1.0.1"
         try:
-            with open("version.json") as f:
+            with open("data/version.json") as f:
                 data = json.load(f)
                 self.current_version = data.get("version", "1.0.0")
                 parts = self.current_version.split(".")
