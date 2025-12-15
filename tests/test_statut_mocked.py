@@ -235,3 +235,65 @@ async def test_update_status_logic_automatic_change(statut_cog) -> None:
     statut_cog._send_log.assert_called_once()
     statut_cog._send_ping.assert_called_once()
     assert statut_cog._last_known_status == Status.OFFLINE
+
+@pytest.mark.asyncio
+async def test_check_ids(statut_cog) -> None:
+    """Test the _check_ids method via direct call."""
+
+    # Mock bot.get_channel
+    channel_ok = MagicMock(spec=discord.TextChannel)
+    channel_ok.name = "status-channel"
+    channel_ok.guild.name = "Guild"
+
+    # Mock role
+    role = MagicMock()
+    role.name = "PingRole"
+    channel_ok.guild.get_role.return_value = role
+
+    logs_channel_ok = MagicMock(spec=discord.TextChannel)
+    logs_channel_ok.name = "logs-channel"
+    logs_channel_ok.guild.name = "Guild"
+
+    def get_channel_side_effect(channel_id):
+        if channel_id == 456: # CHANNEL_ID
+            return channel_ok
+        if channel_id == 101: # LOGS_CHANNEL_ID
+            return logs_channel_ok
+        return None
+
+    statut_cog.bot.get_channel.side_effect = get_channel_side_effect
+
+    # Mock Bot ID check (self monitoring)
+    statut_cog.bot.user.id = 123 # BOT_ID
+
+    with patch("cog.statut.log") as mock_log:
+        await statut_cog._check_ids()
+
+        # Verify calls
+        statut_cog.bot.get_channel.assert_any_call(456)
+        statut_cog.bot.get_channel.assert_any_call(101)
+        channel_ok.guild.get_role.assert_called_with(102) # ROLE_ID
+
+        # Verify logs
+        # We expect 4 success logs (Channel, Role, Logs, Bot)
+        assert mock_log.info.call_count >= 4
+        mock_log.error.assert_not_called()
+        mock_log.warning.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_check_ids_failure(statut_cog) -> None:
+    """Test the _check_ids method with failures."""
+
+    # Mock bot.get_channel returning None or invalid types
+    statut_cog.bot.get_channel.return_value = None
+
+    # Mock Bot ID check failure
+    statut_cog.bot.user.id = 999
+    statut_cog.bot.guilds = []
+
+    with patch("cog.statut.log") as mock_log:
+        await statut_cog._check_ids()
+
+        # We expect errors for channels and warning for bot id
+        assert mock_log.error.call_count >= 1 # Channel invalid
+        assert mock_log.warning.call_count >= 2 # Logs Channel not found, Bot ID not found

@@ -485,9 +485,53 @@ class Statut(commands.Cog):
                     content="\n".join(progress_log)
                 )
 
+    async def _check_ids(self) -> None:
+        """Vérifie la validité des IDs configurés au démarrage."""
+        # Check Channel
+        channel = self.bot.get_channel(CHANNEL_ID)
+        if not channel:
+            log.error(f"❌ CHANNEL_ID invalide: Impossible de trouver le salon avec l'ID {CHANNEL_ID}.")
+        elif not isinstance(channel, discord.TextChannel):
+            log.error(f"❌ CHANNEL_ID invalide: L'ID {CHANNEL_ID} ne correspond pas à un salon textuel.")
+        else:
+            log.info(f"✅ CHANNEL_ID valide: {channel.name} ({channel.guild.name})")
+
+            # Check Role (dependant on channel guild)
+            role = channel.guild.get_role(PING_ROLE_ID)
+            if not role:
+                 log.warning(f"⚠️ ROLE_ID introuvable: Le rôle avec l'ID {PING_ROLE_ID} n'existe pas dans le serveur {channel.guild.name}.")
+            else:
+                 log.info(f"✅ ROLE_ID valide: {role.name}")
+
+        # Check Logs Channel
+        logs_channel = self.bot.get_channel(LOGS_CHANNEL_ID)
+        if not logs_channel:
+            log.warning(f"⚠️ LOGS_CHANNEL_ID introuvable: Impossible de trouver le salon avec l'ID {LOGS_CHANNEL_ID}.")
+        elif not isinstance(logs_channel, discord.TextChannel):
+            log.warning(f"⚠️ LOGS_CHANNEL_ID invalide: L'ID {LOGS_CHANNEL_ID} ne correspond pas à un salon textuel.")
+        else:
+            log.info(f"✅ LOGS_CHANNEL_ID valide: {logs_channel.name} ({logs_channel.guild.name})")
+
+        # Check Bot ID
+        target_member = None
+        if self.bot.user.id == BOT_ID:
+             log.info(f"✅ BOT_ID valide: Le bot se surveille lui-même.")
+        else:
+            found = False
+            for guild in self.bot.guilds:
+                if guild.get_member(BOT_ID):
+                    found = True
+                    break
+            if found:
+                log.info(f"✅ BOT_ID valide: Bot cible trouvé dans les serveurs communs.")
+            else:
+                log.warning(f"⚠️ BOT_ID introuvable: Impossible de trouver le membre avec l'ID {BOT_ID} dans les serveurs communs.")
+
     @_automatic_check_task.before_loop
     async def before_check(self) -> None:
         await self.bot.wait_until_ready()
+
+        await self._check_ids()
 
         # On essaie d'initialiser le statut connu à partir du message existant
         if self._message_id:
