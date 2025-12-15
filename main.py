@@ -45,9 +45,7 @@ console_handler.setFormatter(
 logger.addHandler(console_handler)
 
 
-logging.getLogger("discord").propagate = False
-logging.getLogger("discord.http").propagate = False
-logging.getLogger("aiohttp").propagate = False
+logging.getLogger("werkzeug").propagate = False
 
 
 # --- CONFIGURATION (chargée depuis PARAM.py) ---
