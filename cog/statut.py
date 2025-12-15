@@ -13,7 +13,6 @@ import pytz
 import PARAM
 
 # --- Configuration du logging ---
-logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("discord")
 
 # --- Constantes ---
@@ -438,7 +437,6 @@ class Statut(commands.Cog):
     @_automatic_check_task.before_loop
     async def before_check(self) -> None:
         await self.bot.wait_until_ready()
-        log.info("Initialisation du statut avant le démarrage de la boucle...")
         channel = self.bot.get_channel(CHANNEL_ID)
         if not channel or not isinstance(channel, discord.TextChannel):
             return
