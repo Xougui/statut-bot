@@ -46,7 +46,7 @@ class Version(commands.Cog):
             return
 
         try:
-            with open("version.json", "w") as f:
+            with open("data/version.json", "w") as f:
                 json.dump({"version": version}, f, indent=2)
             logging.info(f"Version mise à jour vers : {version}")
             await interaction.response.send_message(
