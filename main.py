@@ -32,19 +32,6 @@ EXTENSIONS = [
 ]
 
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
-for handler in logger.handlers[:]:
-    logger.removeHandler(handler)
-
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setFormatter(
-    logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s")
-)
-logger.addHandler(console_handler)
-
-
 logging.getLogger("werkzeug").propagate = False
 
 
