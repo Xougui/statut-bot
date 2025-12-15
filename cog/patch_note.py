@@ -15,9 +15,6 @@ from google.genai import types
 import PARAM
 
 # Configurez le logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
 
 # Récupération de la clé API Gemini depuis les variables d'environnement
 gemini_api_key = os.getenv("GEMINI_API")
