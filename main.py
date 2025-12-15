@@ -27,6 +27,7 @@ import PARAM  # Importe les variables de configuration depuis le fichier PARAM.p
 EXTENSIONS = [
     "cog.statut",
     "cog.maj",  # Assure-toi que le chemin est correct (ex: 'cogs.maj' si c'est dans un dossier 'cogs')
+    "cog.patch_note",
 ]
 
 

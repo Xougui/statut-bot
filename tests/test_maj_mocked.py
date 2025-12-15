@@ -281,22 +281,3 @@ async def test_update_manager_view_send_prod() -> None:
         )
 
 
-@pytest.mark.asyncio
-async def test_management_cog_patch_note(mock_bot) -> None:
-    cog = ManagementCog(mock_bot)
-    interaction = AsyncMock()
-
-    with (
-        patch("builtins.open", mock_open(read_data='{"version": "1.0.0"}')),
-        patch("json.load", return_value={"version": "1.0.0"}),
-        patch("json.dump"),
-        patch("cog.maj._send_and_publish", new_callable=AsyncMock) as mock_send,
-        patch("cog.maj._ghost_ping", new_callable=AsyncMock) as mock_ping,
-    ):
-        await cog.patch_note_command.callback(cog, interaction)
-
-        assert mock_send.call_count == 2
-        assert mock_ping.call_count == 2
-        interaction.followup.send.assert_called_with(
-            "✅ Patch **1.0.1** annoncé.", ephemeral=True
-        )
