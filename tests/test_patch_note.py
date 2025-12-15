@@ -39,16 +39,17 @@ async def test_patch_note_modal_submit() -> None:
     modal.message_input = MagicMock(value="New patch features")
 
     # Mock Gemini helper
-    with patch(
-        "cog.patch_note._process_patch_text", new_callable=AsyncMock
-    ) as mock_process:
+    with (
+        patch(
+            "cog.patch_note._process_patch_text", new_callable=AsyncMock
+        ) as mock_process,
+        patch("cog.patch_note._split_message", return_value=["msg1"]),
+        patch("cog.patch_note.PARAM") as mock_param,
+    ):
         mock_process.return_value = ("Corrigé FR", "Translated EN")
+        mock_param.UPDATE_CHANNEL_ID_TEST = 123
 
-        with patch("cog.patch_note._split_message", return_value=["msg1"]):
-            with patch("cog.patch_note.PARAM") as mock_param:
-                mock_param.UPDATE_CHANNEL_ID_TEST = 123
-
-                await modal.on_submit(interaction)
+        await modal.on_submit(interaction)
 
     # Verify flow
     interaction.response.send_message.assert_called()
