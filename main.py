@@ -28,6 +28,7 @@ EXTENSIONS = [
     "cog.statut",
     "cog.maj",  # Assure-toi que le chemin est correct (ex: 'cogs.maj' si c'est dans un dossier 'cogs')
     "cog.patch_note",
+    "cog.version",
 ]
 
 
@@ -67,7 +68,7 @@ intents.members = (
 )
 intents.presences = True  # Si tu veux surveiller les présences des membres (pour les commandes slash, etc.)
 
-bot = commands.Bot(command_prefix="s%", intents=intents)
+bot = commands.Bot(command_prefix="s%", intents=intents, owner_ids=set(PARAM.owners))
 
 
 couleur = PARAM.couleur
