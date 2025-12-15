@@ -8,7 +8,7 @@
 # We must patch sys.modules or use patch.dict on os.environ if it used env vars, but it uses PARAM.
 # Strategy: Mock PARAM completely before importing cog.statut
 import sys
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch, mock_open
 
 import discord
 import pytest
@@ -16,7 +16,7 @@ import pytest
 mock_param = MagicMock()
 mock_param.BOT_ID = 123
 mock_param.CHANNEL_ID = 456
-mock_param.MESSAGE_ID = 789
+# mock_param.MESSAGE_ID = 789  # Removed from PARAM
 mock_param.LOGS_CHANNEL_ID = 101
 mock_param.ROLE_ID = 102
 mock_param.offline = "🔴"
@@ -40,7 +40,10 @@ def mock_bot() -> MagicMock:
 @pytest.fixture
 def statut_cog(mock_bot: MagicMock) -> Statut:
     # Prevent the task from starting automatically during init
-    with patch("discord.ext.tasks.Loop.start") as mock_start:
+    with patch("discord.ext.tasks.Loop.start") as mock_start, \
+         patch("builtins.open", mock_open(read_data='{"message_id": 789}')) as mock_file, \
+         patch("os.path.exists", return_value=True):
+
         cog = Statut(mock_bot)
         # Verify start was called
         mock_start.assert_called_once()
@@ -144,6 +147,9 @@ async def test_update_status_logic_manual(statut_cog) -> None:
     message.embeds = [MagicMock(title="🔴・**Bot hors ligne**")]
     channel.fetch_message.return_value = message
 
+    # Set the dynamic ID
+    statut_cog._message_id = 789
+
     statut_cog._last_known_status = Status.OFFLINE
 
     # Run
@@ -178,6 +184,9 @@ async def test_update_status_logic_automatic_no_change(statut_cog) -> None:
     message.embeds = [MagicMock(title="🟢・**Bot en ligne**")]
     channel.fetch_message.return_value = message
 
+    # Set the dynamic ID
+    statut_cog._message_id = 789
+
     statut_cog._last_known_status = Status.ONLINE
 
     statut_cog._update_embed = AsyncMock()
@@ -208,6 +217,9 @@ async def test_update_status_logic_automatic_change(statut_cog) -> None:
     message = AsyncMock()
     message.embeds = [MagicMock(title="🟢・**Bot en ligne**")]
     channel.fetch_message.return_value = message
+
+    # Set the dynamic ID
+    statut_cog._message_id = 789
 
     statut_cog._last_known_status = Status.ONLINE
 

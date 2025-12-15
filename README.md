@@ -1,11 +1,18 @@
 # Status Bot - Surveillez vos Bots et Annoncez vos Mises à Jour
 
+![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)
+![Discord.py](https://img.shields.io/badge/discord.py-2.0%2B-5865F2)
+![Status](https://img.shields.io/badge/status-active-success)
+
 Bienvenue sur le **Status Bot** ! Ce projet est conçu pour surveiller l'état de vos bots Discord et gérer vos annonces de mises à jour avec l'aide de l'intelligence artificielle.
 
 ## ✨ Fonctionnalités Principales
 
 1.  **Surveillance Automatique** : Vérifie le statut d'un bot cible (En ligne, Hors ligne, Maintenance) toutes les 5 secondes.
-2.  **Affichage Dynamique** : Met à jour automatiquement le nom d'un salon et un message (Embed) pour refléter le statut.
+2.  **Affichage Dynamique** :
+    *   Met à jour automatiquement le nom d'un salon (ex: `🟢・online`).
+    *   Gère un message (Embed) de statut qui se met à jour en temps réel.
+    *   Recrée automatiquement le message de statut s'il est supprimé.
 3.  **Gestion des Mises à Jour (IA)** : Rédigez vos patch notes en français, l'IA (Google Gemini) corrige le texte et le traduit automatiquement en anglais.
 4.  **Système de Versionning** : Gestion automatisée des numéros de version et déploiement rapide.
 
@@ -89,10 +96,10 @@ Explications des variables dans `PARAM.py` :
 *   `owners` : Votre ID utilisateur (pour avoir accès aux commandes admin).
 *   `BOT_ID` : L'ID du bot que vous voulez surveiller.
 *   `CHANNEL_ID` : L'ID du salon textuel qui changera de nom (ex: 🟢・online).
-*   `MESSAGE_ID` : L'ID du message (dans le salon ci-dessus) que le bot modifiera pour afficher le statut détaillé.
-    *   *Astuce : Envoyez un message "Statut..." avec le bot, copiez son ID, et mettez-le ici.*
 *   `LOGS_CHANNEL_ID` : L'ID d'un salon privé où le bot enverra l'historique des changements (Logs).
 *   `ROLE_ID` : L'ID du rôle à mentionner ("ping") quand le bot surveillé tombe en panne.
+
+*Note : Le bot créera automatiquement un fichier `data/statut.json` pour se souvenir de l'ID du message de statut. Si vous supprimez le message sur Discord, le bot en créera un nouveau automatiquement.*
 
 ---
 
