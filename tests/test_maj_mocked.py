@@ -25,7 +25,6 @@ sys.modules["google.genai.types"] = MagicMock()
 
 import cog.maj as maj_module  # to access client  # noqa: E402
 from cog.maj import (  # noqa: E402
-    ManagementCog,
     UpdateManagerView,
     UpdateModal,
     _build_message,
@@ -279,5 +278,3 @@ async def test_update_manager_view_send_prod() -> None:
         interaction.followup.send.assert_called_with(
             "✅ Mise à jour déployée en production !", ephemeral=True
         )
-
-
