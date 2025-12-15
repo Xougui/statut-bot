@@ -1,10 +1,13 @@
 # Status Bot - Surveillez vos Bots et Annoncez vos Mises à Jour
 
-Bienvenue sur le **Status Bot** ! Ce projet est conçu pour être facile à utiliser, même si vous n'avez jamais codé de votre vie.
+Bienvenue sur le **Status Bot** ! Ce projet est conçu pour surveiller l'état de vos bots Discord et gérer vos annonces de mises à jour avec l'aide de l'intelligence artificielle.
 
-Ce bot a deux fonctions principales :
-1.  **Surveiller le statut d'un autre bot** (En ligne, Hors ligne, Maintenance) et mettre à jour un salon Discord automatiquement.
-2.  **Gérer des mises à jour** (Patch notes) et les publier en Français et en Anglais grâce à l'intelligence artificielle (Google Gemini).
+## ✨ Fonctionnalités Principales
+
+1.  **Surveillance Automatique** : Vérifie le statut d'un bot cible (En ligne, Hors ligne, Maintenance) toutes les 5 secondes.
+2.  **Affichage Dynamique** : Met à jour automatiquement le nom d'un salon et un message (Embed) pour refléter le statut.
+3.  **Gestion des Mises à Jour (IA)** : Rédigez vos patch notes en français, l'IA (Google Gemini) corrige le texte et le traduit automatiquement en anglais.
+4.  **Système de Versionning** : Gestion automatisée des numéros de version et déploiement rapide.
 
 ---
 
@@ -12,7 +15,7 @@ Ce bot a deux fonctions principales :
 
 Avant d'installer le bot, assurez-vous d'avoir les éléments suivants :
 
-1.  **Python 3.8+** : Le logiciel qui permet de faire tourner le code.
+1.  **Python 3.9+** : Le logiciel qui permet de faire tourner le code.
     *   [Télécharger Python ici](https://www.python.org/downloads/) (Cochez bien la case **"Add Python to PATH"** lors de l'installation !).
 
 2.  **Un Bot Discord** :
@@ -33,7 +36,7 @@ Avant d'installer le bot, assurez-vous d'avoir les éléments suivants :
 Si vous avez téléchargé le fichier `.zip`, extrayez-le dans un dossier de votre choix.
 Si vous connaissez `git`, vous pouvez cloner le dépôt :
 ```bash
-git clone https://github.com/votre-pseudo/status-bot.git
+git clone https://github.com/Xougui/statut-bot.git
 cd status-bot
 ```
 
@@ -87,7 +90,7 @@ Explications des variables dans `PARAM.py` :
 *   `BOT_ID` : L'ID du bot que vous voulez surveiller.
 *   `CHANNEL_ID` : L'ID du salon textuel qui changera de nom (ex: 🟢・online).
 *   `MESSAGE_ID` : L'ID du message (dans le salon ci-dessus) que le bot modifiera pour afficher le statut détaillé.
-    *   *Astuce : Envoyez un message "Statut..." avec le bot ou vous-même, copiez son ID, et mettez-le ici.*
+    *   *Astuce : Envoyez un message "Statut..." avec le bot, copiez son ID, et mettez-le ici.*
 *   `LOGS_CHANNEL_ID` : L'ID d'un salon privé où le bot enverra l'historique des changements (Logs).
 *   `ROLE_ID` : L'ID du rôle à mentionner ("ping") quand le bot surveillé tombe en panne.
 
