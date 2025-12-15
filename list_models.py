@@ -19,6 +19,8 @@ client = genai.Client(api_key=api_key)
 
 print("Récupération de la liste des modèles...")
 models = list(client.models.list())
+# Tri des modèles par ordre alphabétique de leur nom d'affichage pour un rangement propre
+models.sort(key=lambda m: getattr(m, "display_name", "") or "N/A")
 
 # Calcul de la largeur maximale pour l'alignement (ID + marge)
 max_len = max((len(m.name.replace("models/", "")) for m in models), default=20) + 4
