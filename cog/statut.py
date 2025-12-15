@@ -3,7 +3,9 @@ from collections.abc import Callable
 import contextlib
 import datetime
 from enum import Enum
+import json
 import logging
+import os
 
 import discord
 from discord import app_commands
@@ -18,7 +20,6 @@ log = logging.getLogger("discord")
 # --- Constantes ---
 BOT_ID = PARAM.BOT_ID
 CHANNEL_ID = PARAM.CHANNEL_ID
-MESSAGE_ID = PARAM.MESSAGE_ID
 LOGS_CHANNEL_ID = PARAM.LOGS_CHANNEL_ID
 PING_ROLE_ID = PARAM.ROLE_ID
 
@@ -31,6 +32,7 @@ COLOR_ONLINE = 0x00BF63
 COLOR_MAINTENANCE = 0x004AAD
 
 PARIS_TZ = pytz.timezone("Europe/Paris")
+DATA_FILE = "data/statut.json"
 
 
 class Status(Enum):
@@ -63,10 +65,35 @@ class Statut(commands.Cog):
         self._last_known_status: Status | None = None
         self._manual_reason: str | None = None
         self._update_lock = asyncio.Lock()
+        self._message_id: int | None = None
+        self._load_state()
         self._automatic_check_task.start()
 
     def cog_unload(self) -> None:
         self._automatic_check_task.cancel()
+
+    # --- Gestion de l'état persistant ---
+
+    def _load_state(self) -> None:
+        """Charge l'ID du message depuis le fichier JSON."""
+        if os.path.exists(DATA_FILE):
+            try:
+                with open(DATA_FILE, encoding="utf-8") as f:
+                    data = json.load(f)
+                    self._message_id = data.get("message_id")
+            except Exception as e:
+                log.error(f"Erreur lors du chargement de {DATA_FILE}: {e}")
+        else:
+            log.info(f"{DATA_FILE} n'existe pas, il sera créé.")
+
+    def _save_state(self) -> None:
+        """Sauvegarde l'ID du message dans le fichier JSON."""
+        os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
+        try:
+            with open(DATA_FILE, "w", encoding="utf-8") as f:
+                json.dump({"message_id": self._message_id}, f, indent=4)
+        except Exception as e:
+            log.error(f"Erreur lors de la sauvegarde de {DATA_FILE}: {e}")
 
     # --- Fonctions d'analyse de statut ---
 
@@ -99,6 +126,27 @@ class Statut(commands.Cog):
         return None
 
     # --- Fonctions de mise à jour de bas niveau ---
+
+    async def _create_status_message(
+        self, channel: discord.TextChannel
+    ) -> discord.Message | None:
+        """Crée un nouveau message de statut."""
+        # On initialise avec un statut 'offline' par défaut pour commencer proprement
+        embed = discord.Embed(
+            title=f"{OFFLINE_EMOJI}・**Bot hors ligne**",
+            description="Le bot **Lyxios** est **hors ligne**.\n\n> Ne vous inquiétez pas, le bot reviendra en ligne !\n> Check ça pour savoir si le bot est `online` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi\n-# Merci de votre patience.",
+            color=COLOR_OFFLINE,
+        )
+        embed.set_footer(text="Initialisation du statut...")
+        try:
+            message = await channel.send(embed=embed)
+            self._message_id = message.id
+            self._save_state()
+            log.info(f"Nouveau message de statut créé (ID: {message.id}).")
+            return message
+        except discord.HTTPException as e:
+            log.error(f"Erreur lors de la création du message de statut: {e}")
+            return None
 
     async def _update_embed(
         self, message: discord.Message, status: Status, reason: str | None = None
@@ -330,20 +378,29 @@ class Statut(commands.Cog):
                     )
                 return
 
-            try:
-                message = await channel.fetch_message(MESSAGE_ID)
-                embed_status = self._get_status_from_embed(
-                    message.embeds[0] if message.embeds else None
-                )
-            except (discord.NotFound, discord.Forbidden) as e:
-                log.error(
-                    f"Impossible de récupérer le message de statut (ID: {MESSAGE_ID}). Erreur: {e}"
-                )
-                if is_interactive and interaction:
-                    await interaction.followup.send(
-                        "❌ Message de statut introuvable.", ephemeral=True
+            message = None
+            if self._message_id:
+                try:
+                    message = await channel.fetch_message(self._message_id)
+                except (discord.NotFound, discord.Forbidden):
+                    log.warning(
+                        f"Message de statut (ID: {self._message_id}) introuvable. Création d'un nouveau..."
                     )
-                return
+                    message = None
+
+            if not message:
+                message = await self._create_status_message(channel)
+                if not message:
+                    if is_interactive and interaction:
+                        await interaction.followup.send(
+                            "❌ Impossible de créer le message de statut.",
+                            ephemeral=True,
+                        )
+                    return
+
+            embed_status = self._get_status_from_embed(
+                message.embeds[0] if message.embeds else None
+            )
 
             name_status = self._get_status_from_channel_name(channel)
 
@@ -434,25 +491,89 @@ class Statut(commands.Cog):
                     content="\n".join(progress_log)
                 )
 
+    async def _check_ids(self) -> None:
+        """Vérifie la validité des IDs configurés au démarrage."""
+        # Check Channel
+        channel = self.bot.get_channel(CHANNEL_ID)
+        if not channel:
+            log.error(
+                f"❌ CHANNEL_ID invalide: Impossible de trouver le salon avec l'ID {CHANNEL_ID}."
+            )
+        elif not isinstance(channel, discord.TextChannel):
+            log.error(
+                f"❌ CHANNEL_ID invalide: L'ID {CHANNEL_ID} ne correspond pas à un salon textuel."
+            )
+        else:
+            log.info(f"✅ CHANNEL_ID valide: {channel.name} ({channel.guild.name})")
+
+            # Check Role (dependant on channel guild)
+            role = channel.guild.get_role(PING_ROLE_ID)
+            if not role:
+                log.warning(
+                    f"⚠️ ROLE_ID introuvable: Le rôle avec l'ID {PING_ROLE_ID} n'existe pas dans le serveur {channel.guild.name}."
+                )
+            else:
+                log.info(f"✅ ROLE_ID valide: {role.name}")
+
+        # Check Logs Channel
+        logs_channel = self.bot.get_channel(LOGS_CHANNEL_ID)
+        if not logs_channel:
+            log.warning(
+                f"⚠️ LOGS_CHANNEL_ID introuvable: Impossible de trouver le salon avec l'ID {LOGS_CHANNEL_ID}."
+            )
+        elif not isinstance(logs_channel, discord.TextChannel):
+            log.warning(
+                f"⚠️ LOGS_CHANNEL_ID invalide: L'ID {LOGS_CHANNEL_ID} ne correspond pas à un salon textuel."
+            )
+        else:
+            log.info(
+                f"✅ LOGS_CHANNEL_ID valide: {logs_channel.name} ({logs_channel.guild.name})"
+            )
+
+        # Check Bot ID
+        if self.bot.user.id == BOT_ID:
+            log.info("✅ BOT_ID valide: Le bot se surveille lui-même.")
+        else:
+            found = False
+            for guild in self.bot.guilds:
+                if guild.get_member(BOT_ID):
+                    found = True
+                    break
+            if found:
+                log.info(
+                    "✅ BOT_ID valide: Bot cible trouvé dans les serveurs communs."
+                )
+            else:
+                log.warning(
+                    f"⚠️ BOT_ID introuvable: Impossible de trouver le membre avec l'ID {BOT_ID} dans les serveurs communs."
+                )
+
     @_automatic_check_task.before_loop
     async def before_check(self) -> None:
         await self.bot.wait_until_ready()
-        channel = self.bot.get_channel(CHANNEL_ID)
-        if not channel or not isinstance(channel, discord.TextChannel):
-            return
-        try:
-            message = await channel.fetch_message(MESSAGE_ID)
-            self._last_known_status = self._get_status_from_embed(
-                message.embeds[0] if message.embeds else None
-            )
-            if self._last_known_status:
-                log.info(
-                    f"Statut initialisé à partir du message existant : {self._last_known_status.name}"
-                )
-        except (discord.NotFound, discord.Forbidden):
-            log.warning(
-                f"Message de statut (ID: {MESSAGE_ID}) non trouvé/accessible pour l'initialisation."
-            )
+
+        await self._check_ids()
+
+        # On essaie d'initialiser le statut connu à partir du message existant
+        if self._message_id:
+            channel = self.bot.get_channel(CHANNEL_ID)
+            if channel and isinstance(channel, discord.TextChannel):
+                try:
+                    message = await channel.fetch_message(self._message_id)
+                    self._last_known_status = self._get_status_from_embed(
+                        message.embeds[0] if message.embeds else None
+                    )
+                    if self._last_known_status:
+                        log.info(
+                            f"Statut initialisé à partir du message existant : {self._last_known_status.name}"
+                        )
+                except (discord.NotFound, discord.Forbidden):
+                    log.warning(
+                        f"Message de statut (ID: {self._message_id}) non trouvé lors de l'initialisation. Un nouveau sera créé."
+                    )
+                    # On ne crée pas le message tout de suite, la boucle le fera
+                    self._message_id = None
+                    self._save_state()
 
     # --- Commande manuelle ---
 
