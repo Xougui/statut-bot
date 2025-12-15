@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Callable
 import contextlib
 import io
 import json
@@ -52,7 +53,7 @@ def _split_message(content: str, limit: int = 2000) -> list[str]:
     return chunks
 
 
-def is_owner():
+def is_owner() -> Callable:
     """
     Vérifie si l'utilisateur qui exécute la commande est un propriétaire défini dans PARAM.owners.
     """
