@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Callable
 import contextlib
 import datetime
 from enum import Enum
@@ -41,7 +42,7 @@ class Status(Enum):
     MAINTENANCE = "maintenance"
 
 
-def is_owner():
+def is_owner() -> Callable:
     """
     Vérifie si l'utilisateur qui exécute la commande est un propriétaire défini dans PARAM.owners.
     """
