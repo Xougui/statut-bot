@@ -25,7 +25,6 @@ sys.modules["google.genai.types"] = MagicMock()
 
 import cog.maj as maj_module  # to access client  # noqa: E402
 from cog.maj import (  # noqa: E402
-    ManagementCog,
     UpdateManagerView,
     UpdateModal,
     _build_message,
@@ -155,7 +154,7 @@ async def test_build_message_french() -> None:
     msg = _build_message(texts, is_english=False)
 
     assert "# 📢 My Update 📢" in msg
-    assert "Coucou à toute la communauté !" in msg
+    assert "<@999> a reçu une mise à jour ! 🧪" in msg
     assert "- ✅: Added feature" in msg
     assert "- ❌: Removed bug" in msg
     assert "- ⏳: In progress" in msg
@@ -173,7 +172,7 @@ async def test_build_message_english() -> None:
 
     msg = _build_message(texts, is_english=True)
 
-    assert "Hello to the entire community!" in msg
+    assert "<@999> received an update ! 🧪" in msg
     assert "- ✅ Added feature" in msg
     assert "The Development Team." in msg
 
@@ -278,25 +277,4 @@ async def test_update_manager_view_send_prod() -> None:
         assert mock_ping.call_count == 2  # FR and EN
         interaction.followup.send.assert_called_with(
             "✅ Mise à jour déployée en production !", ephemeral=True
-        )
-
-
-@pytest.mark.asyncio
-async def test_management_cog_patch_note(mock_bot) -> None:
-    cog = ManagementCog(mock_bot)
-    interaction = AsyncMock()
-
-    with (
-        patch("builtins.open", mock_open(read_data='{"version": "1.0.0"}')),
-        patch("json.load", return_value={"version": "1.0.0"}),
-        patch("json.dump"),
-        patch("cog.maj._send_and_publish", new_callable=AsyncMock) as mock_send,
-        patch("cog.maj._ghost_ping", new_callable=AsyncMock) as mock_ping,
-    ):
-        await cog.patch_note_command.callback(cog, interaction)
-
-        assert mock_send.call_count == 2
-        assert mock_ping.call_count == 2
-        interaction.followup.send.assert_called_with(
-            "✅ Patch **1.0.1** annoncé.", ephemeral=True
         )

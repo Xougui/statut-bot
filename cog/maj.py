@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Callable
 import contextlib
 import io
 import json
@@ -25,7 +26,11 @@ load_dotenv()
 gemini_api_key = os.getenv("GEMINI_API")
 
 # Client instance
-client = genai.Client(api_key=gemini_api_key)
+if gemini_api_key:
+    client = genai.Client(api_key=gemini_api_key)
+else:
+    client = None
+    logging.warning("GEMINI_API key not found. AI features will be disabled.")
 
 # --- Helpers ---
 
@@ -59,7 +64,7 @@ def _split_message(content: str, limit: int = 2000) -> list[str]:
     return chunks
 
 
-def is_owner() -> app_commands.Check:
+def is_owner() -> Callable:
     """
     Vérifie si l'utilisateur qui exécute la commande est un propriétaire défini dans PARAM.owners.
     """
@@ -155,6 +160,10 @@ async def _send_and_publish(
 
 async def _call_gemini_api(prompt: str, schema: dict) -> dict | None:
     """Appelle l'API Gemini avec une nouvelle tentative en cas d'échec."""
+    if not client:
+        logging.error("Client Gemini non initialisé (Clé API manquante ?).")
+        return None
+
     max_retries = 3
     for attempt in range(max_retries):
         try:
@@ -583,6 +592,12 @@ class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
 
         test_channel = interaction.guild.get_channel(PARAM.UPDATE_CHANNEL_ID_TEST)
 
+        if not test_channel:
+            await followup_message.edit(
+                content="❌ Erreur: Le canal de test est introuvable. Vérifiez l'ID dans PARAM.py."
+            )
+            return
+
         view = UpdateManagerView(
             corrected_texts, translated_texts, files_data, interaction
         )
@@ -630,62 +645,6 @@ class ManagementCog(commands.Cog):
     ) -> None:
         files = [attachments] if attachments else []
         await interaction.response.send_modal(UpdateModal(attachments=files))
-
-    @app_commands.command(
-        name="patch-note",
-        description="[🤖 Dev] Déploie un patch et incrémente la version.",
-    )
-    @is_owner()
-    async def patch_note_command(self, interaction: discord.Interaction) -> None:
-        """Annonce un patch, incrémente la version et notifie les canaux."""
-        await interaction.response.defer(ephemeral=True)
-        try:
-            with open("version.json", "r+") as f:
-                data = json.load(f)
-                current_version = data.get("version", "1.0.0")
-
-                parts = current_version.split(".")
-                if len(parts) != 3 or not all(p.isdigit() for p in parts):
-                    await interaction.followup.send(
-                        f"❌ Format de version invalide: `{current_version}`.",
-                        ephemeral=True,
-                    )
-                    return
-
-                new_version = f"{parts[0]}.{parts[1]}.{int(parts[2]) + 1}"
-                data["version"] = new_version
-
-                f.seek(0)
-                json.dump(data, f, indent=2)
-                f.truncate()
-            logging.info(f"Version incrémentée à {new_version}")
-
-        except FileNotFoundError:
-            await interaction.followup.send(
-                "❌ `version.json` introuvable. Utilisez `/update` d'abord.",
-                ephemeral=True,
-            )
-            return
-        except (json.JSONDecodeError, KeyError) as e:
-            await interaction.followup.send(
-                f"❌ Erreur de lecture de `version.json`: {e}", ephemeral=True
-            )
-            return
-
-        fr_channel = self.bot.get_channel(PARAM.UPDATE_CHANNEL_ID_FR)
-        en_channel = self.bot.get_channel(PARAM.UPDATE_CHANNEL_ID_EN)
-
-        message_fr = f"**⚙️ Patch Déployé !**\n\nUn nouveau patch vient d'être appliqué. La version est maintenant la **{new_version}**."
-        message_en = f"**⚙️ Patch Deployed!**\n\nA new patch has just been applied. The version is now **{new_version}**."
-
-        await _send_and_publish(fr_channel, message_fr)
-        await _ghost_ping(fr_channel)
-        await _send_and_publish(en_channel, message_en)
-        await _ghost_ping(en_channel)
-
-        await interaction.followup.send(
-            f"✅ Patch **{new_version}** annoncé.", ephemeral=True
-        )
 
     @update_command.error
     async def update_command_error(
