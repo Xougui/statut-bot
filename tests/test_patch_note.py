@@ -1,25 +1,25 @@
-
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, mock_open
-import discord
-from discord import ui
-import json
 import os
+from unittest.mock import AsyncMock, MagicMock, mock_open, patch
+
+from discord import ui
+import pytest
 
 # Ensure env var is set for module import
 os.environ["GEMINI_API"] = "fake_key"
 
 from cog.patch_note import PatchNoteCog, PatchNoteModal, PatchNoteView
 
+
 @pytest.mark.asyncio
-async def test_patch_note_command_registration():
+async def test_patch_note_command_registration() -> None:
     bot = AsyncMock()
     cog = PatchNoteCog(bot)
     assert hasattr(cog, "patch_note")
     assert cog.patch_note.name == "patch-note"
 
+
 @pytest.mark.asyncio
-async def test_patch_note_modal_submit():
+async def test_patch_note_modal_submit() -> None:
     # Mock interaction
     interaction = AsyncMock()
     interaction.response = AsyncMock()
@@ -39,11 +39,13 @@ async def test_patch_note_modal_submit():
     modal.message_input = MagicMock(value="New patch features")
 
     # Mock Gemini helper
-    with patch("cog.patch_note._process_patch_text", new_callable=AsyncMock) as mock_process:
+    with patch(
+        "cog.patch_note._process_patch_text", new_callable=AsyncMock
+    ) as mock_process:
         mock_process.return_value = ("Corrigé FR", "Translated EN")
 
         with patch("cog.patch_note._split_message", return_value=["msg1"]):
-             with patch("cog.patch_note.PARAM") as mock_param:
+            with patch("cog.patch_note.PARAM") as mock_param:
                 mock_param.UPDATE_CHANNEL_ID_TEST = 123
 
                 await modal.on_submit(interaction)
@@ -56,8 +58,9 @@ async def test_patch_note_modal_submit():
     channel = interaction.guild.get_channel.return_value
     channel.send.assert_called()
 
+
 @pytest.mark.asyncio
-async def test_patch_note_view_send_prod():
+async def test_patch_note_view_send_prod() -> None:
     # Mock interaction
     interaction = AsyncMock()
     interaction.guild.get_channel = MagicMock(return_value=AsyncMock())
@@ -67,16 +70,19 @@ async def test_patch_note_view_send_prod():
         en_message="Message EN",
         new_version="1.0.1",
         file_data=("image.png", b"data"),
-        original_interaction=interaction
+        original_interaction=interaction,
     )
 
     # Mock file operations and helpers
-    with patch("builtins.open", mock_open()), \
-         patch("json.dump"), \
-         patch("cog.patch_note._send_and_publish", new_callable=AsyncMock) as mock_send_pub, \
-         patch("cog.patch_note._ghost_ping", new_callable=AsyncMock), \
-         patch("cog.patch_note.PARAM") as mock_param:
-
+    with (
+        patch("builtins.open", mock_open()),
+        patch("json.dump"),
+        patch(
+            "cog.patch_note._send_and_publish", new_callable=AsyncMock
+        ) as mock_send_pub,
+        patch("cog.patch_note._ghost_ping", new_callable=AsyncMock),
+        patch("cog.patch_note.PARAM") as mock_param,
+    ):
         mock_param.UPDATE_CHANNEL_ID_FR = 111
         mock_param.UPDATE_CHANNEL_ID_EN = 222
 
@@ -115,4 +121,4 @@ async def test_patch_note_view_send_prod():
     # Verify
     # Should get channels for FR and EN
     assert interaction.guild.get_channel.call_count == 2
-    assert mock_send_pub.call_count == 2 # Once for FR, once for EN
+    assert mock_send_pub.call_count == 2  # Once for FR, once for EN
