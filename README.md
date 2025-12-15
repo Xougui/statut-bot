@@ -23,7 +23,9 @@ Bienvenue sur le **Status Bot** ! Ce projet est conçu pour surveiller l'état d
 Avant d'installer le bot, assurez-vous d'avoir les éléments suivants :
 
 1.  **Python 3.9+** : Le logiciel qui permet de faire tourner le code.
-    *   [Télécharger Python ici](https://www.python.org/downloads/) (Cochez bien la case **"Add Python to PATH"** lors de l'installation !).
+    *   [Télécharger Python ici](https://www.python.org/downloads/).
+> [!WARNING]
+> Cochez bien la case **"Add Python to PATH"** lors de l'installation !
 
 2.  **Un Bot Discord** :
     *   Allez sur le [Portail des Développeurs Discord](https://discord.com/developers/applications).
