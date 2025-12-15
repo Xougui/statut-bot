@@ -22,7 +22,11 @@ logging.basicConfig(
 gemini_api_key = os.getenv("GEMINI_API")
 
 # Client instance
-client = genai.Client(api_key=gemini_api_key)
+if gemini_api_key:
+    client = genai.Client(api_key=gemini_api_key)
+else:
+    client = None
+    logging.warning("GEMINI_API key not found. AI features will be disabled.")
 
 
 # --- Helpers (Duplicated from cog/maj.py to remain self-contained) ---
@@ -141,6 +145,10 @@ async def _send_and_publish(
 
 async def _call_gemini_api(prompt: str, schema: dict) -> dict | None:
     """Appelle l'API Gemini avec une nouvelle tentative en cas d'échec."""
+    if not client:
+        logging.error("Client Gemini non initialisé (Clé API manquante ?).")
+        return None
+
     max_retries = 3
     for attempt in range(max_retries):
         try:
