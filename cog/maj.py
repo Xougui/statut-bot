@@ -80,16 +80,14 @@ def is_owner() -> Callable:
     return app_commands.check(predicate)
 
 
-async def _ghost_ping(channel: discord.TextChannel) -> None:
-    """Envoie une mention de rôle supprimée rapidement."""
+async def _send_ping(channel: discord.TextChannel) -> None:
+    """Envoie une mention de rôle."""
     if not channel:
         return
     try:
-        mention = await channel.send(f"<@&{PARAM.UPDATE_ROLE_ID}>")
-        await asyncio.sleep(1)
-        await mention.delete()
+        await channel.send(f"<@&{PARAM.UPDATE_ROLE_ID}>")
     except Exception as e:
-        logging.error(f"Erreur lors du ghost ping dans {channel.name}: {e}")
+        logging.error(f"Erreur lors du ping dans {channel.name}: {e}")
 
 
 async def _send_and_publish(
@@ -467,7 +465,7 @@ class UpdateManagerView(ui.View):
             files_fr.append(discord.File(io.BytesIO(file_bytes), filename=filename))
 
         await _send_and_publish(fr_channel, french_message, files_fr)
-        await _ghost_ping(fr_channel)
+        await _send_ping(fr_channel)
 
         # Re-create files for EN
         files_en = []
@@ -475,7 +473,7 @@ class UpdateManagerView(ui.View):
             files_en.append(discord.File(io.BytesIO(file_bytes), filename=filename))
 
         await _send_and_publish(en_channel, english_message, files_en)
-        await _ghost_ping(en_channel)
+        await _send_ping(en_channel)
 
         await interaction.followup.send(
             "✅ Mise à jour déployée en production !", ephemeral=True
