@@ -62,13 +62,13 @@ def test_get_status_from_embed(statut_cog) -> None:
 
 def test_get_status_from_channel_name(statut_cog) -> None:
     channel = MagicMock()
-    channel.name = "═🟢・online"
+    channel.name = "🟢・online"
     assert statut_cog._get_status_from_channel_name(channel) == Status.ONLINE
 
-    channel.name = "═🔴・offline"
+    channel.name = "🔴・offline"
     assert statut_cog._get_status_from_channel_name(channel) == Status.OFFLINE
 
-    channel.name = "═🔵・maintenance"
+    channel.name = "🔵・maintenance"
     assert statut_cog._get_status_from_channel_name(channel) == Status.MAINTENANCE
 
     assert statut_cog._get_status_from_channel_name(None) is None
@@ -100,10 +100,10 @@ async def test_update_channel_name(statut_cog) -> None:
 
     # Test Update
     assert await statut_cog._update_channel_name(channel, Status.ONLINE) is True
-    channel.edit.assert_called_with(name="═🟢・online")
+    channel.edit.assert_called_with(name="🟢・online")
 
     # Test No Change Needed
-    channel.name = "═🟢・online"
+    channel.name = "🟢・online"
     channel.edit.reset_mock()
     assert await statut_cog._update_channel_name(channel, Status.ONLINE) is True
     channel.edit.assert_not_called()
@@ -133,8 +133,11 @@ async def test_update_status_logic_manual(statut_cog) -> None:
     statut_cog._send_ping = AsyncMock(return_value=True)
 
     # Mock fetch_message
-    channel = AsyncMock()
-    channel.name = "═🔴・offline"
+    channel = MagicMock(spec=discord.TextChannel)
+    channel.name = "🔴・offline"
+    channel.fetch_message = AsyncMock()
+    channel.edit = AsyncMock()
+    channel.send = AsyncMock()
     statut_cog.bot.get_channel.return_value = channel
 
     message = AsyncMock()
@@ -165,8 +168,11 @@ async def test_update_status_logic_automatic_no_change(statut_cog) -> None:
     statut_cog.bot.guilds = [guild]
 
     # Setup current status is online
-    channel = AsyncMock()
-    channel.name = "═🟢・online"
+    channel = MagicMock(spec=discord.TextChannel)
+    channel.name = "🟢・online"
+    channel.fetch_message = AsyncMock()
+    channel.edit = AsyncMock()
+    channel.send = AsyncMock()
     statut_cog.bot.get_channel.return_value = channel
     message = AsyncMock()
     message.embeds = [MagicMock(title="🟢・**Bot en ligne**")]
@@ -193,8 +199,11 @@ async def test_update_status_logic_automatic_change(statut_cog) -> None:
     statut_cog.bot.guilds = [guild]
 
     # Setup current status is ONLINE
-    channel = AsyncMock()
-    channel.name = "═🟢・online"
+    channel = MagicMock(spec=discord.TextChannel)
+    channel.name = "🟢・online"
+    channel.fetch_message = AsyncMock()
+    channel.edit = AsyncMock()
+    channel.send = AsyncMock()
     statut_cog.bot.get_channel.return_value = channel
     message = AsyncMock()
     message.embeds = [MagicMock(title="🟢・**Bot en ligne**")]
