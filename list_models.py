@@ -4,7 +4,7 @@ import sys
 from dotenv import (
     load_dotenv,  # Utilisé pour charger les variables d'environnement (le token) depuis un fichier .env
 )
-import google.generativeai as genai
+from google import genai
 
 load_dotenv()
 api_key = os.getenv("GEMINI_API")
@@ -15,8 +15,10 @@ if not api_key:
     )
     sys.exit(1)
 
-genai.configure(api_key=api_key)
+client = genai.Client(api_key=api_key)
 
-for m in genai.list_models():
-    if "generateContent" in m.supported_generation_methods:
-        print(m.name)
+with open("models.txt", "w", encoding="utf-8") as f:
+    for m in client.models.list():
+        f.write(
+            f"{m.name.replace('models/', '')}   |   {getattr(m, 'display_name', '')}\n"
+        )
