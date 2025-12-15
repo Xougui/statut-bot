@@ -25,7 +25,11 @@ load_dotenv()
 gemini_api_key = os.getenv("GEMINI_API")
 
 # Client instance
-client = genai.Client(api_key=gemini_api_key)
+if gemini_api_key:
+    client = genai.Client(api_key=gemini_api_key)
+else:
+    client = None
+    logging.warning("GEMINI_API key not found. AI features will be disabled.")
 
 # --- Helpers ---
 
@@ -582,6 +586,12 @@ class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
         )
 
         test_channel = interaction.guild.get_channel(PARAM.UPDATE_CHANNEL_ID_TEST)
+
+        if not test_channel:
+            await followup_message.edit(
+                content="❌ Erreur: Le canal de test est introuvable. Vérifiez l'ID dans PARAM.py."
+            )
+            return
 
         view = UpdateManagerView(
             corrected_texts, translated_texts, files_data, interaction
