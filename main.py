@@ -522,6 +522,7 @@ if __name__ == "__main__":
     else:
         # Exécuter la fonction asynchrone main
         try:
+            discord.utils.setup_logging()
             asyncio.run(main())
         except KeyboardInterrupt:
             print("Bot arrêté par l'utilisateur.")
