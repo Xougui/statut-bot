@@ -27,6 +27,7 @@ client = genai.Client(api_key=gemini_api_key)
 
 # --- Helpers (Duplicated from cog/maj.py to remain self-contained) ---
 
+
 def _split_message(content: str, limit: int = 2000) -> list[str]:
     """Découpe un message en morceaux de `limit` caractères maximum."""
     if len(content) <= limit:
@@ -51,6 +52,7 @@ def is_owner():
     """
     Vérifie si l'utilisateur qui exécute la commande est un propriétaire défini dans PARAM.owners.
     """
+
     async def predicate(interaction: discord.Interaction) -> bool:
         if interaction.user.id not in PARAM.owners:
             await interaction.response.send_message(
@@ -58,6 +60,7 @@ def is_owner():
             )
             return False
         return True
+
     return app_commands.check(predicate)
 
 
@@ -95,11 +98,17 @@ async def _send_and_publish(
             if channel.is_news():
                 try:
                     await msg.publish()
-                    logging.info(f"Message publié dans le canal d'annonces {channel.name}.")
+                    logging.info(
+                        f"Message publié dans le canal d'annonces {channel.name}."
+                    )
                 except discord.Forbidden:
-                    logging.error(f"Permissions insuffisantes pour publier dans {channel.name}.")
+                    logging.error(
+                        f"Permissions insuffisantes pour publier dans {channel.name}."
+                    )
                 except Exception as e:
-                    logging.error(f"Erreur lors de la publication dans {channel.name}: {e}")
+                    logging.error(
+                        f"Erreur lors de la publication dans {channel.name}: {e}"
+                    )
 
             try:
                 verify_emoji = discord.PartialEmoji(
@@ -110,16 +119,25 @@ async def _send_and_publish(
                 logging.error(f"Impossible d'ajouter la réaction: {e}")
 
     except discord.Forbidden:
-        logging.error(f"Permissions insuffisantes pour envoyer des messages dans {channel.name}.")
+        logging.error(
+            f"Permissions insuffisantes pour envoyer des messages dans {channel.name}."
+        )
         if followup_message:
-            await followup_message.edit(content=f"❌ Erreur: Permissions insuffisantes pour le canal {channel.name}.")
+            await followup_message.edit(
+                content=f"❌ Erreur: Permissions insuffisantes pour le canal {channel.name}."
+            )
     except Exception as e:
-        logging.error(f"Erreur inattendue lors de l'envoi dans {channel.name}: {e}", exc_info=True)
+        logging.error(
+            f"Erreur inattendue lors de l'envoi dans {channel.name}: {e}", exc_info=True
+        )
         if followup_message:
-            await followup_message.edit(content="❌ Une erreur est survenue lors de l'envoi du message.")
+            await followup_message.edit(
+                content="❌ Une erreur est survenue lors de l'envoi du message."
+            )
 
 
 # --- Translation and Correction ---
+
 
 async def _call_gemini_api(prompt: str, schema: dict) -> dict | None:
     """Appelle l'API Gemini avec une nouvelle tentative en cas d'échec."""
@@ -140,13 +158,17 @@ async def _call_gemini_api(prompt: str, schema: dict) -> dict | None:
                 try:
                     return json.loads(response.text)
                 except (ValueError, json.JSONDecodeError) as e:
-                    logging.error(f"Error parsing JSON from Gemini: {e}\nResponse received: {response.text}")
+                    logging.error(
+                        f"Error parsing JSON from Gemini: {e}\nResponse received: {response.text}"
+                    )
                     return None
             else:
                 logging.warning("Structure de réponse de l'API Gemini inattendue.")
                 return None
         except Exception as e:
-            logging.error(f"Erreur API Gemini (tentative {attempt + 1}/{max_retries}): {e}")
+            logging.error(
+                f"Erreur API Gemini (tentative {attempt + 1}/{max_retries}): {e}"
+            )
             await asyncio.sleep(2**attempt)
     logging.error(f"Échec de l'appel à l'API Gemini après {max_retries} tentatives.")
     return None
@@ -168,7 +190,7 @@ async def _process_patch_text(text: str) -> tuple[str, str]:
     schema_fr = {
         "type": "OBJECT",
         "properties": {"corrected_text": {"type": "STRING"}},
-        "required": ["corrected_text"]
+        "required": ["corrected_text"],
     }
     corrected_data = await _call_gemini_api(prompt_fr, schema_fr)
     fr_text = corrected_data.get("corrected_text", text) if corrected_data else text
@@ -184,7 +206,7 @@ async def _process_patch_text(text: str) -> tuple[str, str]:
     schema_en = {
         "type": "OBJECT",
         "properties": {"translated_text": {"type": "STRING"}},
-        "required": ["translated_text"]
+        "required": ["translated_text"],
     }
     translated_data = await _call_gemini_api(prompt_en, schema_en)
     en_text = translated_data.get("translated_text", "") if translated_data else ""
@@ -194,8 +216,13 @@ async def _process_patch_text(text: str) -> tuple[str, str]:
 
 class EditPatchModal(ui.Modal):
     """Modal pour éditer le texte du patch note (FR ou EN)."""
+
     def __init__(self, text: str, is_english: bool, view: "PatchNoteView") -> None:
-        title = "Éditer Patch Note (Anglais)" if is_english else "Éditer Patch Note (Français)"
+        title = (
+            "Éditer Patch Note (Anglais)"
+            if is_english
+            else "Éditer Patch Note (Français)"
+        )
         super().__init__(title=title)
         self.is_english = is_english
         self.view_ref = view
@@ -205,7 +232,7 @@ class EditPatchModal(ui.Modal):
             default=text,
             style=discord.TextStyle.paragraph,
             required=False,
-            max_length=2000
+            max_length=2000,
         )
         self.add_item(self.text_input)
 
@@ -219,7 +246,15 @@ class EditPatchModal(ui.Modal):
 
 class PatchNoteView(ui.View):
     """Vue pour gérer l'envoi du patch note."""
-    def __init__(self, fr_message: str, en_message: str, new_version: str, file_data: tuple[str, bytes] | None, original_interaction: discord.Interaction):
+
+    def __init__(
+        self,
+        fr_message: str,
+        en_message: str,
+        new_version: str,
+        file_data: tuple[str, bytes] | None,
+        original_interaction: discord.Interaction,
+    ) -> None:
         super().__init__(timeout=None)
         self.fr_message = fr_message
         self.en_message = en_message
@@ -242,7 +277,9 @@ class PatchNoteView(ui.View):
 
         files = []
         if self.file_data:
-            files.append(discord.File(io.BytesIO(self.file_data[1]), filename=self.file_data[0]))
+            files.append(
+                discord.File(io.BytesIO(self.file_data[1]), filename=self.file_data[0])
+            )
 
         chunks = _split_message(full_preview)
 
@@ -261,16 +298,24 @@ class PatchNoteView(ui.View):
         for i, chunk in enumerate(chunks):
             is_last = i == len(chunks) - 1
             current_view = self if is_last else None
-            current_files = files if is_last else None # Re-create file object if needed or use valid one
+            current_files = (
+                files if is_last else None
+            )  # Re-create file object if needed or use valid one
 
             # Re-create file object because it is consumed
             if self.file_data and is_last:
-                 current_files = [discord.File(io.BytesIO(self.file_data[1]), filename=self.file_data[0])]
+                current_files = [
+                    discord.File(
+                        io.BytesIO(self.file_data[1]), filename=self.file_data[0]
+                    )
+                ]
 
             await channel.send(content=chunk, files=current_files, view=current_view)
 
     @ui.button(label="Envoyer Production", style=discord.ButtonStyle.green)
-    async def send_prod(self, interaction: discord.Interaction, button: ui.Button) -> None:
+    async def send_prod(
+        self, interaction: discord.Interaction, button: ui.Button
+    ) -> None:
         await interaction.response.defer()
         for child in self.children:
             child.disabled = True
@@ -283,7 +328,9 @@ class PatchNoteView(ui.View):
             logging.info(f"Version sauvegardée : {self.new_version}")
         except Exception as e:
             logging.error(f"Erreur sauvegarde version: {e}")
-            await interaction.followup.send(f"❌ Erreur lors de la sauvegarde de la version: {e}", ephemeral=True)
+            await interaction.followup.send(
+                f"❌ Erreur lors de la sauvegarde de la version: {e}", ephemeral=True
+            )
             return
 
         fr_channel = interaction.guild.get_channel(PARAM.UPDATE_CHANNEL_ID_FR)
@@ -291,34 +338,54 @@ class PatchNoteView(ui.View):
 
         fr_text, en_text = self._build_final_messages()
 
-        files_fr = [discord.File(io.BytesIO(self.file_data[1]), filename=self.file_data[0])] if self.file_data else []
+        files_fr = (
+            [discord.File(io.BytesIO(self.file_data[1]), filename=self.file_data[0])]
+            if self.file_data
+            else []
+        )
         await _send_and_publish(fr_channel, fr_text, files_fr)
         await _ghost_ping(fr_channel)
 
-        files_en = [discord.File(io.BytesIO(self.file_data[1]), filename=self.file_data[0])] if self.file_data else []
+        files_en = (
+            [discord.File(io.BytesIO(self.file_data[1]), filename=self.file_data[0])]
+            if self.file_data
+            else []
+        )
         await _send_and_publish(en_channel, en_text, files_en)
         await _ghost_ping(en_channel)
 
-        await interaction.followup.send(f"✅ Patch **{self.new_version}** déployé !", ephemeral=True)
+        await interaction.followup.send(
+            f"✅ Patch **{self.new_version}** déployé !", ephemeral=True
+        )
 
     @ui.button(label="Éditer FR", style=discord.ButtonStyle.blurple)
-    async def edit_fr(self, interaction: discord.Interaction, button: ui.Button) -> None:
-        await interaction.response.send_modal(EditPatchModal(self.fr_message, False, self))
+    async def edit_fr(
+        self, interaction: discord.Interaction, button: ui.Button
+    ) -> None:
+        await interaction.response.send_modal(
+            EditPatchModal(self.fr_message, False, self)
+        )
 
     @ui.button(label="Éditer EN", style=discord.ButtonStyle.blurple)
-    async def edit_en(self, interaction: discord.Interaction, button: ui.Button) -> None:
-        await interaction.response.send_modal(EditPatchModal(self.en_message, True, self))
+    async def edit_en(
+        self, interaction: discord.Interaction, button: ui.Button
+    ) -> None:
+        await interaction.response.send_modal(
+            EditPatchModal(self.en_message, True, self)
+        )
 
     @ui.button(label="Annuler", style=discord.ButtonStyle.red)
     async def cancel(self, interaction: discord.Interaction, button: ui.Button) -> None:
-        await interaction.response.send_message("❌ Déploiement du patch annulé.", ephemeral=True)
+        await interaction.response.send_message(
+            "❌ Déploiement du patch annulé.", ephemeral=True
+        )
         for child in self.children:
             child.disabled = True
         await interaction.message.edit(view=self)
 
 
 class PatchNoteModal(ui.Modal, title="Déployer un Patch"):
-    def __init__(self, attachment_data: tuple[str, bytes] | None):
+    def __init__(self, attachment_data: tuple[str, bytes] | None) -> None:
         super().__init__()
         self.attachment_data = attachment_data
 
@@ -326,7 +393,7 @@ class PatchNoteModal(ui.Modal, title="Déployer un Patch"):
         self.current_version = "1.0.0"
         self.next_version = "1.0.1"
         try:
-            with open("version.json", "r") as f:
+            with open("version.json") as f:
                 data = json.load(f)
                 self.current_version = data.get("version", "1.0.0")
                 parts = self.current_version.split(".")
@@ -336,23 +403,22 @@ class PatchNoteModal(ui.Modal, title="Déployer un Patch"):
             pass
 
         self.version_input = ui.TextInput(
-            label="Version",
-            default=self.next_version,
-            max_length=20,
-            required=True
+            label="Version", default=self.next_version, max_length=20, required=True
         )
         self.message_input = ui.TextInput(
             label="Message du patch (Optionnel)",
             style=discord.TextStyle.paragraph,
             required=False,
-            max_length=2000
+            max_length=2000,
         )
 
         self.add_item(self.version_input)
         self.add_item(self.message_input)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
-        await interaction.response.send_message("🚀 Préparation du patch note...", ephemeral=True)
+        await interaction.response.send_message(
+            "🚀 Préparation du patch note...", ephemeral=True
+        )
         followup = await interaction.original_response()
 
         new_version = self.version_input.value
@@ -362,12 +428,16 @@ class PatchNoteModal(ui.Modal, title="Déployer un Patch"):
         en_message = ""
 
         if raw_message:
-            await followup.edit(content="✨ Traitement du texte (Correction & Traduction)...")
+            await followup.edit(
+                content="✨ Traitement du texte (Correction & Traduction)..."
+            )
             fr_message, en_message = await _process_patch_text(raw_message)
 
         await followup.edit(content="📤 Envoi de la prévisualisation...")
 
-        view = PatchNoteView(fr_message, en_message, new_version, self.attachment_data, interaction)
+        view = PatchNoteView(
+            fr_message, en_message, new_version, self.attachment_data, interaction
+        )
 
         # Initial preview
         fr_final = f"**⚙️ Patch Déployé !**\n\nUn nouveau patch vient d'être appliqué. La version est maintenant la **{new_version}**."
@@ -384,8 +454,8 @@ class PatchNoteModal(ui.Modal, title="Déployer un Patch"):
         channel = interaction.guild.get_channel(PARAM.UPDATE_CHANNEL_ID_TEST)
 
         if not channel:
-             await followup.edit(content="❌ Canal de test introuvable.")
-             return
+            await followup.edit(content="❌ Canal de test introuvable.")
+            return
 
         for i, chunk in enumerate(chunks):
             is_last = i == len(chunks) - 1
@@ -393,7 +463,12 @@ class PatchNoteModal(ui.Modal, title="Déployer un Patch"):
 
             files = []
             if self.attachment_data and is_last:
-                 files = [discord.File(io.BytesIO(self.attachment_data[1]), filename=self.attachment_data[0])]
+                files = [
+                    discord.File(
+                        io.BytesIO(self.attachment_data[1]),
+                        filename=self.attachment_data[0],
+                    )
+                ]
 
             await channel.send(content=chunk, files=files, view=current_view)
 
@@ -404,20 +479,28 @@ class PatchNoteCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    @app_commands.command(name="patch-note", description="[🤖 Dev] Déploie un patch et incrémente la version.")
+    @app_commands.command(
+        name="patch-note",
+        description="[🤖 Dev] Déploie un patch et incrémente la version.",
+    )
     @app_commands.describe(image="Image optionnelle à joindre.")
     @is_owner()
-    async def patch_note(self, interaction: discord.Interaction, image: discord.Attachment | None = None) -> None:
+    async def patch_note(
+        self, interaction: discord.Interaction, image: discord.Attachment | None = None
+    ) -> None:
         attachment_data = None
         if image:
             try:
                 data = await image.read()
                 attachment_data = (image.filename, data)
             except Exception as e:
-                await interaction.response.send_message(f"❌ Erreur lecture image: {e}", ephemeral=True)
+                await interaction.response.send_message(
+                    f"❌ Erreur lecture image: {e}", ephemeral=True
+                )
                 return
 
         await interaction.response.send_modal(PatchNoteModal(attachment_data))
+
 
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(PatchNoteCog(bot))
