@@ -90,7 +90,8 @@ GEMINI_API=VOTRE_CLE_GOOGLE_GEMINI_ICI
 
 ### 2. Le fichier `PARAM.py` (Vos IDs Discord)
 Ouvrez le fichier `PARAM.py`. Vous devez remplacer les chiffres par les IDs de votre serveur.
-*Pour avoir les IDs : Sur Discord, allez dans Paramètres > Avancés > Activez le Mode Développeur. Ensuite, faites Clic Droit > Copier l'ID sur les salons/rôles/utilisateurs.*
+> [!TIP]
+> Pour avoir les IDs : Sur Discord, allez dans Paramètres > Avancés > Activez le Mode Développeur. Ensuite, faites Clic Droit > Copier l'ID sur les salons/rôles/utilisateurs.*
 
 Explications des variables dans `PARAM.py` :
 *   `owners` : Votre ID utilisateur (pour avoir accès aux commandes admin).
