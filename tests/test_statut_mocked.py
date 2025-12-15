@@ -8,7 +8,7 @@
 # We must patch sys.modules or use patch.dict on os.environ if it used env vars, but it uses PARAM.
 # Strategy: Mock PARAM completely before importing cog.statut
 import sys
-from unittest.mock import AsyncMock, MagicMock, patch, mock_open
+from unittest.mock import AsyncMock, MagicMock, mock_open, patch
 
 import discord
 import pytest
@@ -40,10 +40,11 @@ def mock_bot() -> MagicMock:
 @pytest.fixture
 def statut_cog(mock_bot: MagicMock) -> Statut:
     # Prevent the task from starting automatically during init
-    with patch("discord.ext.tasks.Loop.start") as mock_start, \
-         patch("builtins.open", mock_open(read_data='{"message_id": 789}')) as mock_file, \
-         patch("os.path.exists", return_value=True):
-
+    with (
+        patch("discord.ext.tasks.Loop.start") as mock_start,
+        patch("builtins.open", mock_open(read_data='{"message_id": 789}')),
+        patch("os.path.exists", return_value=True),
+    ):
         cog = Statut(mock_bot)
         # Verify start was called
         mock_start.assert_called_once()
@@ -236,6 +237,7 @@ async def test_update_status_logic_automatic_change(statut_cog) -> None:
     statut_cog._send_ping.assert_called_once()
     assert statut_cog._last_known_status == Status.OFFLINE
 
+
 @pytest.mark.asyncio
 async def test_check_ids(statut_cog) -> None:
     """Test the _check_ids method via direct call."""
@@ -255,16 +257,16 @@ async def test_check_ids(statut_cog) -> None:
     logs_channel_ok.guild.name = "Guild"
 
     def get_channel_side_effect(channel_id):
-        if channel_id == 456: # CHANNEL_ID
+        if channel_id == 456:  # CHANNEL_ID
             return channel_ok
-        if channel_id == 101: # LOGS_CHANNEL_ID
+        if channel_id == 101:  # LOGS_CHANNEL_ID
             return logs_channel_ok
         return None
 
     statut_cog.bot.get_channel.side_effect = get_channel_side_effect
 
     # Mock Bot ID check (self monitoring)
-    statut_cog.bot.user.id = 123 # BOT_ID
+    statut_cog.bot.user.id = 123  # BOT_ID
 
     with patch("cog.statut.log") as mock_log:
         await statut_cog._check_ids()
@@ -272,13 +274,14 @@ async def test_check_ids(statut_cog) -> None:
         # Verify calls
         statut_cog.bot.get_channel.assert_any_call(456)
         statut_cog.bot.get_channel.assert_any_call(101)
-        channel_ok.guild.get_role.assert_called_with(102) # ROLE_ID
+        channel_ok.guild.get_role.assert_called_with(102)  # ROLE_ID
 
         # Verify logs
         # We expect 4 success logs (Channel, Role, Logs, Bot)
         assert mock_log.info.call_count >= 4
         mock_log.error.assert_not_called()
         mock_log.warning.assert_not_called()
+
 
 @pytest.mark.asyncio
 async def test_check_ids_failure(statut_cog) -> None:
@@ -295,5 +298,7 @@ async def test_check_ids_failure(statut_cog) -> None:
         await statut_cog._check_ids()
 
         # We expect errors for channels and warning for bot id
-        assert mock_log.error.call_count >= 1 # Channel invalid
-        assert mock_log.warning.call_count >= 2 # Logs Channel not found, Bot ID not found
+        assert mock_log.error.call_count >= 1  # Channel invalid
+        assert (
+            mock_log.warning.call_count >= 2
+        )  # Logs Channel not found, Bot ID not found
