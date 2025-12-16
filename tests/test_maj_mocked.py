@@ -1,5 +1,5 @@
-import sys
 import os
+import sys
 from unittest.mock import AsyncMock, MagicMock, mock_open, patch
 
 import pytest
@@ -298,11 +298,11 @@ async def test_update_manager_view_send_prod() -> None:
         # If view.send_prod is a Button, we call its callback.
 
         if hasattr(view.send_prod, "callback"):
-             # It is an Item
-             await view.send_prod.callback(interaction)
+            # It is an Item
+            await view.send_prod.callback(interaction)
         else:
-             # It is a function (unlikely with @ui.button)
-             await view.send_prod(interaction)
+            # It is a function (unlikely with @ui.button)
+            await view.send_prod(interaction)
 
         assert mock_send.call_count == 2  # FR and EN
         assert mock_ping.call_count == 2  # FR and EN
