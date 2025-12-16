@@ -27,7 +27,7 @@ else:
     logging.warning("GEMINI_API key not found. AI features will be disabled.")
 
 
-# --- Helpers (Duplicated from cog/maj.py to remain self-contained) ---
+# --- Helpers (Matched with cog/maj.py) ---
 
 
 def _split_message(content: str, limit: int = 2000) -> list[str]:
@@ -184,73 +184,115 @@ async def _call_gemini_api(prompt: str, schema: dict) -> dict | None:
     return None
 
 
-async def _process_patch_text(text: str) -> tuple[str, str]:
-    """Corrects French text and translates to English using Gemini."""
-    if not text:
-        return "", ""
-
-    # Correct French
-    prompt_fr = (
-        "Agis comme un correcteur orthographique et grammatical expert. Corrige le texte français suivant.\n"
+async def _correct_french_text(text_parts: dict) -> dict:
+    """Corrige le texte français du patch note en utilisant l'API Gemini."""
+    prompt = (
+        "Agis comme un correcteur orthographique et grammatical expert. Corrige le texte français suivant. "
         "Règles strictes :\n"
-        "1. Réponds uniquement avec un objet JSON valide contenant la clé 'corrected_text'.\n"
-        "2. PRÉSERVE scrupuleusement les emojis et la mise en forme.\n\n"
-        f"Texte: {text}"
+        "1. Réponds uniquement avec un objet JSON valide contenant les clés : 'corrected_changes'.\n"
+        "2. Le contenu de 'corrected_changes' doit être UNIQUEMENT le texte corrigé, SANS titre, SANS préfixe (comme 'Changements:'), et SANS guillemets supplémentaires.\n"
+        "3. PRÉSERVE scrupuleusement la mise en forme, TOUS les sauts de ligne (\n), et les caractères spéciaux.\n"
+        "4. NE CHANGE PAS les mots techniques, les noms propres, ou les termes que tu ne connais pas.\n\n"
+        f"Texte à corriger :\n{text_parts['changes']}"
     )
-    schema_fr = {
+    schema = {
         "type": "OBJECT",
-        "properties": {"corrected_text": {"type": "STRING"}},
-        "required": ["corrected_text"],
+        "properties": {
+            "corrected_changes": {"type": "STRING"},
+        },
+        "required": [
+            "corrected_changes",
+        ],
     }
-    corrected_data = await _call_gemini_api(prompt_fr, schema_fr)
-    fr_text = corrected_data.get("corrected_text", text) if corrected_data else text
+    corrected_data = await _call_gemini_api(prompt, schema)
+    if corrected_data:
+        logging.info("Correction française réussie.")
+        return {
+            "changes": corrected_data.get(
+                "corrected_changes", text_parts["changes"]
+            ).replace("\\n", "\n"),
+        }
+    logging.warning("Échec de la correction, utilisation du texte original.")
+    return text_parts
 
-    # Translate to English
-    prompt_en = (
+
+async def _translate_to_english(text_parts: dict) -> dict:
+    """Traduit le texte du patch note en anglais en utilisant l'API Gemini."""
+    prompt = (
         "Agis comme un traducteur expert du français vers l'anglais. Traduis le texte suivant.\n"
         "Règles strictes :\n"
-        "1. Réponds uniquement avec un objet JSON valide contenant la clé 'translated_text'.\n"
-        "2. PRÉSERVE scrupuleusement les emojis et la mise en forme.\n\n"
-        f"Texte original: {fr_text}"
+        "1. Réponds uniquement avec un objet JSON valide contenant les clés : 'changes'.\n"
+        "2. Le contenu de 'changes' doit être UNIQUEMENT le texte traduit, SANS titre, SANS préfixe (comme 'Changes:'), et SANS guillemets supplémentaires.\n"
+        "3. PRÉSERVE scrupuleusement la mise en forme et TOUS les sauts de ligne (\n).\n"
+        "4. NE TRADUIS PAS les mots entre `code`, les variables, ou les emojis Discord (<:...:...>).\n"
+        "5. Conserve les termes techniques inchangés si une traduction directe n'est pas évidente.\n\n"
+        f"Texte à traduire :\n{text_parts['changes']}"
     )
-    schema_en = {
+    schema = {
         "type": "OBJECT",
-        "properties": {"translated_text": {"type": "STRING"}},
-        "required": ["translated_text"],
+        "properties": {
+            "changes": {"type": "STRING"},
+        },
+        "required": ["changes"],
     }
-    translated_data = await _call_gemini_api(prompt_en, schema_en)
-    en_text = translated_data.get("translated_text", "") if translated_data else ""
+    translated_data = await _call_gemini_api(prompt, schema)
+    if translated_data:
+        logging.info("Traduction anglaise réussie.")
+        return {
+            "changes": translated_data.get("changes", "").replace("\\n", "\n"),
+        }
+    logging.error("Échec de la traduction.")
+    return {"changes": ""}
 
-    return fr_text.replace("\\n", "\n"), en_text.replace("\\n", "\n")
+
+def _build_message(texts: dict, version: str, is_english: bool) -> str:
+    """Construit le contenu du message de patch note."""
+    changes = texts["changes"]
+
+    if is_english:
+        header = f"**⚙️ Patch Deployed!**\n\nA new patch has just been applied. The version is now **{version}**."
+    else:
+        header = f"**⚙️ Patch Déployé !**\n\nUn nouveau patch vient d'être appliqué. La version est maintenant la **{version}**."
+
+    parts = [header]
+    if changes:
+        parts.append(f"\n\n{changes}")
+
+    return "".join(parts)
 
 
 class EditPatchModal(ui.Modal):
     """Modal pour éditer le texte du patch note (FR ou EN)."""
 
-    def __init__(self, text: str, is_english: bool, view: "PatchNoteView") -> None:
-        title = (
-            "Éditer Patch Note (Anglais)"
-            if is_english
-            else "Éditer Patch Note (Français)"
-        )
+    def __init__(
+        self, texts: dict, is_english: bool, view: "PatchNoteView"
+    ) -> None:
+        title = "Éditer Patch Note (Anglais)" if is_english else "Éditer Patch Note (Français)"
         super().__init__(title=title)
+        self.texts = texts
         self.is_english = is_english
         self.view_ref = view
 
-        self.text_input = ui.TextInput(
-            label="Message",
-            default=text,
+        self.changes_input = ui.TextInput(
+            label="Changements",
+            default=texts.get("changes", ""),
             style=discord.TextStyle.paragraph,
-            required=False,
+            required=True,
             max_length=2000,
         )
-        self.add_item(self.text_input)
+
+        self.add_item(self.changes_input)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        new_texts = {
+            "changes": self.changes_input.value,
+        }
+
         if self.is_english:
-            self.view_ref.en_message = self.text_input.value
+            self.view_ref.en_texts = new_texts
         else:
-            self.view_ref.fr_message = self.text_input.value
+            self.view_ref.fr_texts = new_texts
+
         await self.view_ref.refresh_message(interaction)
 
 
@@ -259,66 +301,67 @@ class PatchNoteView(ui.View):
 
     def __init__(
         self,
-        fr_message: str,
-        en_message: str,
+        fr_texts: dict,
+        en_texts: dict,
         new_version: str,
-        file_data: tuple[str, bytes] | None,
+        files_data: list[tuple[str, bytes]],
         original_interaction: discord.Interaction,
     ) -> None:
         super().__init__(timeout=None)
-        self.fr_message = fr_message
-        self.en_message = en_message
+        self.fr_texts = fr_texts
+        self.en_texts = en_texts
         self.new_version = new_version
-        self.file_data = file_data
+        self.files_data = files_data
         self.original_interaction = original_interaction
 
-    def _build_final_messages(self) -> tuple[str, str]:
-        fr_base = f"**⚙️ Patch Déployé !**\n\nUn nouveau patch vient d'être appliqué. La version est maintenant la **{self.new_version}**."
-        en_base = f"**⚙️ Patch Deployed!**\n\nA new patch has just been applied. The version is now **{self.new_version}**."
-
-        fr_final = f"{fr_base}\n\n{self.fr_message}" if self.fr_message else fr_base
-        en_final = f"{en_base}\n\n{self.en_message}" if self.en_message else en_base
-
-        return fr_final, en_final
-
     async def refresh_message(self, interaction: discord.Interaction) -> None:
-        fr_text, en_text = self._build_final_messages()
-        full_preview = f"{fr_text}\n\n---\n\n{en_text}"
+        """Met à jour le message de test avec les nouvelles données."""
+        french_message = _build_message(self.fr_texts, self.new_version, is_english=False)
+        english_message = _build_message(self.en_texts, self.new_version, is_english=True)
+        full_test_message = f"{french_message}\n\n---\n\n{english_message}"
 
-        files = []
-        if self.file_data:
-            files.append(
-                discord.File(io.BytesIO(self.file_data[1]), filename=self.file_data[0])
-            )
+        chunks = _split_message(full_test_message)
 
-        chunks = _split_message(full_preview)
+        # Helper pour recréer les fichiers (les objets File sont consommés à l'envoi)
+        def get_files() -> list[discord.File]:
+            files = []
+            for filename, file_bytes in self.files_data:
+                files.append(discord.File(io.BytesIO(file_bytes), filename=filename))
+            return files
 
+        # Si un seul morceau, on édite simplement le message existant
+        if len(chunks) == 1:
+            if not interaction.response.is_done():
+                await interaction.response.edit_message(
+                    content=chunks[0], attachments=get_files(), view=self
+                )
+            else:
+                await interaction.edit_original_response(
+                    content=chunks[0], attachments=get_files(), view=self
+                )
+            return
+
+        # Si plusieurs morceaux, on doit supprimer l'ancien message et en envoyer de nouveaux
         if not interaction.response.is_done():
             await interaction.response.defer()
 
-        # Delete old message to handle chunks correctly if size changed
+        # Supprimer l'ancien message (celui qui contient les boutons)
         if interaction.message:
             with contextlib.suppress(discord.HTTPException, discord.Forbidden):
                 await interaction.message.delete()
 
         channel = interaction.channel
         if not channel:
+             # Fallback (peu probable)
+            await interaction.followup.send(
+                "❌ Erreur: Canal introuvable pour le rafraîchissement.", ephemeral=True
+            )
             return
 
         for i, chunk in enumerate(chunks):
             is_last = i == len(chunks) - 1
             current_view = self if is_last else None
-            current_files = (
-                files if is_last else None
-            )  # Re-create file object if needed or use valid one
-
-            # Re-create file object because it is consumed
-            if self.file_data and is_last:
-                current_files = [
-                    discord.File(
-                        io.BytesIO(self.file_data[1]), filename=self.file_data[0]
-                    )
-                ]
+            current_files = get_files() if is_last else None
 
             await channel.send(content=chunk, files=current_files, view=current_view)
 
@@ -346,22 +389,23 @@ class PatchNoteView(ui.View):
         fr_channel = interaction.guild.get_channel(PARAM.UPDATE_CHANNEL_ID_FR)
         en_channel = interaction.guild.get_channel(PARAM.UPDATE_CHANNEL_ID_EN)
 
-        fr_text, en_text = self._build_final_messages()
+        french_message = _build_message(self.fr_texts, self.new_version, is_english=False)
+        english_message = _build_message(self.en_texts, self.new_version, is_english=True)
 
-        files_fr = (
-            [discord.File(io.BytesIO(self.file_data[1]), filename=self.file_data[0])]
-            if self.file_data
-            else []
-        )
-        await _send_and_publish(fr_channel, fr_text, files_fr)
+        # Re-create files for FR
+        files_fr = []
+        for filename, file_bytes in self.files_data:
+            files_fr.append(discord.File(io.BytesIO(file_bytes), filename=filename))
+
+        await _send_and_publish(fr_channel, french_message, files_fr)
         await _ghost_ping(fr_channel)
 
-        files_en = (
-            [discord.File(io.BytesIO(self.file_data[1]), filename=self.file_data[0])]
-            if self.file_data
-            else []
-        )
-        await _send_and_publish(en_channel, en_text, files_en)
+        # Re-create files for EN
+        files_en = []
+        for filename, file_bytes in self.files_data:
+            files_en.append(discord.File(io.BytesIO(file_bytes), filename=filename))
+
+        await _send_and_publish(en_channel, english_message, files_en)
         await _ghost_ping(en_channel)
 
         await interaction.followup.send(
@@ -373,7 +417,7 @@ class PatchNoteView(ui.View):
         self, interaction: discord.Interaction, button: ui.Button
     ) -> None:
         await interaction.response.send_modal(
-            EditPatchModal(self.fr_message, False, self)
+            EditPatchModal(self.fr_texts, is_english=False, view=self)
         )
 
     @ui.button(label="Éditer EN", style=discord.ButtonStyle.blurple)
@@ -381,7 +425,7 @@ class PatchNoteView(ui.View):
         self, interaction: discord.Interaction, button: ui.Button
     ) -> None:
         await interaction.response.send_modal(
-            EditPatchModal(self.en_message, True, self)
+            EditPatchModal(self.en_texts, is_english=True, view=self)
         )
 
     @ui.button(label="Annuler", style=discord.ButtonStyle.red)
@@ -395,9 +439,9 @@ class PatchNoteView(ui.View):
 
 
 class PatchNoteModal(ui.Modal, title="Déployer un Patch"):
-    def __init__(self, attachment_data: tuple[str, bytes] | None) -> None:
+    def __init__(self, attachments: list[discord.Attachment]) -> None:
         super().__init__()
-        self.attachment_data = attachment_data
+        self.attachments = attachments
 
         # Calculate next version
         self.current_version = "1.0.0"
@@ -434,56 +478,61 @@ class PatchNoteModal(ui.Modal, title="Déployer un Patch"):
         new_version = self.version_input.value
         raw_message = self.message_input.value
 
-        fr_message = ""
-        en_message = ""
+        await followup.edit(content="✨ Traitement du texte (Correction & Traduction)...")
 
-        if raw_message:
+        original_texts = {
+            "changes": raw_message,
+        }
+
+        corrected_texts = await _correct_french_text(original_texts)
+        translated_texts = await _translate_to_english(corrected_texts)
+
+        if raw_message and not translated_texts.get("changes"):
             await followup.edit(
-                content="✨ Traitement du texte (Correction & Traduction)..."
+                 content="⚠️ La traduction a échoué. Le message anglais sera incomplet."
             )
-            fr_message, en_message = await _process_patch_text(raw_message)
+            await asyncio.sleep(2)
 
-        if raw_message and not en_message:
-            en_message = "⚠️ Traduction automatique indisponible (Quota API). Veuillez cliquer sur 'Éditer EN' pour ajouter le texte manuellement."
+        # Read files into memory
+        files_data = []
+        for attachment in self.attachments:
+            try:
+                data = await attachment.read()
+                files_data.append((attachment.filename, data))
+            except Exception as e:
+                logging.error(f"Error reading attachment {attachment.filename}: {e}")
+
+        # Prepare files for the test message
+        files_objects = []
+        for filename, file_bytes in files_data:
+            files_objects.append(
+                discord.File(io.BytesIO(file_bytes), filename=filename)
+            )
+
+        french_message = _build_message(corrected_texts, new_version, is_english=False)
+        english_message = _build_message(translated_texts, new_version, is_english=True)
+        full_test_message = f"{french_message}\n\n---\n\n{english_message}"
 
         await followup.edit(content="📤 Envoi de la prévisualisation...")
 
-        view = PatchNoteView(
-            fr_message, en_message, new_version, self.attachment_data, interaction
-        )
+        test_channel = interaction.guild.get_channel(PARAM.UPDATE_CHANNEL_ID_TEST)
 
-        # Initial preview
-        fr_final = f"**⚙️ Patch Déployé !**\n\nUn nouveau patch vient d'être appliqué. La version est maintenant la **{new_version}**."
-        if fr_message:
-            fr_final += f"\n\n{fr_message}"
-
-        en_final = f"**⚙️ Patch Deployed!**\n\nA new patch has just been applied. The version is now **{new_version}**."
-        if en_message:
-            en_final += f"\n\n{en_message}"
-
-        full_preview = f"{fr_final}\n\n---\n\n{en_final}"
-
-        chunks = _split_message(full_preview)
-        channel = interaction.guild.get_channel(PARAM.UPDATE_CHANNEL_ID_TEST)
-
-        if not channel:
+        if not test_channel:
             await followup.edit(content="❌ Canal de test introuvable.")
             return
+
+        view = PatchNoteView(
+            corrected_texts, translated_texts, new_version, files_data, interaction
+        )
+
+        chunks = _split_message(full_test_message)
 
         for i, chunk in enumerate(chunks):
             is_last = i == len(chunks) - 1
             current_view = view if is_last else None
+            current_files = files_objects if is_last else None
 
-            files = []
-            if self.attachment_data and is_last:
-                files = [
-                    discord.File(
-                        io.BytesIO(self.attachment_data[1]),
-                        filename=self.attachment_data[0],
-                    )
-                ]
-
-            await channel.send(content=chunk, files=files, view=current_view)
+            await test_channel.send(content=chunk, files=current_files, view=current_view)
 
         await followup.edit(content="🎉 Prévisualisation envoyée dans le canal test !")
 
@@ -501,18 +550,8 @@ class PatchNoteCog(commands.Cog):
     async def patch_note(
         self, interaction: discord.Interaction, image: discord.Attachment | None = None
     ) -> None:
-        attachment_data = None
-        if image:
-            try:
-                data = await image.read()
-                attachment_data = (image.filename, data)
-            except Exception as e:
-                await interaction.response.send_message(
-                    f"❌ Erreur lecture image: {e}", ephemeral=True
-                )
-                return
-
-        await interaction.response.send_modal(PatchNoteModal(attachment_data))
+        files = [image] if image else []
+        await interaction.response.send_modal(PatchNoteModal(files))
 
 
 async def setup(bot: commands.Bot) -> None:

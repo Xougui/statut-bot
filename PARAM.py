@@ -26,7 +26,7 @@ UPDATE_ROLE_ID = 1350428823052746752  # Rôle à mentionner pour les mises à jo
 
 # --- MODÈLE GEMINI ---
 # Nom du modèle Gemini à utiliser pour la correction et la traduction.
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-flash-latest"
 
 # pipreqs . --force --encoding=utf8 --ignore .venv
 # pip list --outdated | Select-String -Pattern '^\S+' | ForEach-Object { pip install --upgrade $_.Matches.Value }

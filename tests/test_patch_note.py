@@ -1,6 +1,6 @@
 import os
 from unittest.mock import AsyncMock, MagicMock, mock_open, patch
-
+import discord
 from discord import ui
 import pytest
 
@@ -29,7 +29,9 @@ async def test_patch_note_modal_submit() -> None:
     interaction.guild.get_channel = MagicMock(return_value=AsyncMock())
 
     # Mock attachment data
-    attachment_data = ("image.png", b"fake_image_data")
+    attachment_data = [MagicMock(spec=discord.Attachment)]
+    attachment_data[0].read = AsyncMock(return_value=b"fake_image_data")
+    attachment_data[0].filename = "image.png"
 
     # Initialize Modal
     modal = PatchNoteModal(attachment_data)
@@ -41,19 +43,23 @@ async def test_patch_note_modal_submit() -> None:
     # Mock Gemini helper
     with (
         patch(
-            "cog.patch_note._process_patch_text", new_callable=AsyncMock
-        ) as mock_process,
+            "cog.patch_note._correct_french_text", new_callable=AsyncMock
+        ) as mock_correct,
+        patch(
+            "cog.patch_note._translate_to_english", new_callable=AsyncMock
+        ) as mock_translate,
         patch("cog.patch_note._split_message", return_value=["msg1"]),
         patch("cog.patch_note.PARAM") as mock_param,
     ):
-        mock_process.return_value = ("Corrigé FR", "Translated EN")
+        mock_correct.return_value = {"changes": "Corrigé FR"}
+        mock_translate.return_value = {"changes": "Translated EN"}
         mock_param.UPDATE_CHANNEL_ID_TEST = 123
 
         await modal.on_submit(interaction)
 
     # Verify flow
     interaction.response.send_message.assert_called()
-    mock_process.assert_called_with("New patch features")
+    mock_correct.assert_called_with({"changes": "New patch features"})
     # Verify preview sent to test channel
     interaction.guild.get_channel.assert_called_with(123)
     channel = interaction.guild.get_channel.return_value
@@ -67,10 +73,10 @@ async def test_patch_note_view_send_prod() -> None:
     interaction.guild.get_channel = MagicMock(return_value=AsyncMock())
 
     view = PatchNoteView(
-        fr_message="Message FR",
-        en_message="Message EN",
+        fr_texts={"changes": "Message FR"},
+        en_texts={"changes": "Message EN"},
         new_version="1.0.1",
-        file_data=("image.png", b"data"),
+        files_data=[("image.png", b"data")],
         original_interaction=interaction,
     )
 
@@ -90,34 +96,17 @@ async def test_patch_note_view_send_prod() -> None:
         # Simulate button click
         button = MagicMock(spec=ui.Button)
 
-        # Invoke the callback directly using the class method to avoid binding issues
-        # The callback signature is (self, interaction, button)
-        # PatchNoteView.send_prod is a _ViewCallback. It works by accessing its own .callback
-        # But wait, if I access it via Class it might be unbound.
-        # Let's try calling it on the instance `view.send_prod` but passing arguments correctly.
-        # Actually, `view.send_prod` is the decorated thing.
-        # The discord.py ui.button decorator returns a _ViewCallback descriptor.
-        # When accessed from instance, it returns the ItemCallback.
-        # If we access the function itself:
+        # Try calling the callback via the descriptor's callback attribute on the class
+        # If PatchNoteView.send_prod is a _ViewCallback, it has a .callback attribute which is the function.
+        # If PatchNoteView.send_prod is the function itself (unlikely with @ui.button), we call it.
+        # The previous error "AttributeError: 'function' object has no attribute 'callback'" suggests
+        # that PatchNoteView.send_prod MIGHT be the function in this environment?
 
-        # We can just manually trigger the logic by calling the method IF it wasn't decorated, but it is.
-        # The decorated method is stored in `callback` attribute of the item.
-
-        # In testing, the easiest way is often to extract the original function if possible,
-        # OR just rely on the fact that `view.send_prod` when called might be trying to add the item to a view or something else if not in a proper context?
-        # No, `view.send_prod` as a method call on the instance should trigger the callback logic?
-        # Wait, `ui.button` decorator makes it so `send_prod` is NOT the callback anymore, but an Item definition helper.
-
-        # The actual callback is wrapped inside the Item constructed.
-        # But for `View` subclasses, the methods decorated with `@ui.button` are used to construct items when `View` is instantiated.
-        # The actual callback logic remains in the function, but the attribute on the class/instance is the Item factory/descriptor.
-
-        # To test the LOGIC of the callback, we should probably access the underlying function.
-        # `_ViewCallback` stores the original function in `func` or `callback`.
-
-        # Based on previous error "AttributeError: 'function' object has no attribute 'callback'",
-        # PatchNoteView.send_prod IS the function itself.
-        await PatchNoteView.send_prod(view, interaction, button)
+        if hasattr(PatchNoteView.send_prod, "callback"):
+             await PatchNoteView.send_prod.callback(view, interaction, button)
+        else:
+             # It's just the function?
+             await PatchNoteView.send_prod(view, interaction, button)
 
     # Verify
     # Should get channels for FR and EN
