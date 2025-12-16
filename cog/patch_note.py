@@ -173,7 +173,9 @@ async def _call_gemini_api(prompt: str, schema: dict) -> dict | None:
                 return None
         except Exception as e:
             if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                logging.warning("Quota API Gemini atteint (429). Abandon de l'IA pour cette requête.")
+                logging.warning(
+                    "Quota API Gemini atteint (429). Abandon de l'IA pour cette requête."
+                )
                 return None
 
             logging.error(
@@ -264,10 +266,12 @@ def _build_message(texts: dict, version: str, is_english: bool) -> str:
 class EditPatchModal(ui.Modal):
     """Modal pour éditer le texte du patch note (FR ou EN)."""
 
-    def __init__(
-        self, texts: dict, is_english: bool, view: "PatchNoteView"
-    ) -> None:
-        title = "Éditer Patch Note (Anglais)" if is_english else "Éditer Patch Note (Français)"
+    def __init__(self, texts: dict, is_english: bool, view: "PatchNoteView") -> None:
+        title = (
+            "Éditer Patch Note (Anglais)"
+            if is_english
+            else "Éditer Patch Note (Français)"
+        )
         super().__init__(title=title)
         self.texts = texts
         self.is_english = is_english
@@ -316,8 +320,12 @@ class PatchNoteView(ui.View):
 
     async def refresh_message(self, interaction: discord.Interaction) -> None:
         """Met à jour le message de test avec les nouvelles données."""
-        french_message = _build_message(self.fr_texts, self.new_version, is_english=False)
-        english_message = _build_message(self.en_texts, self.new_version, is_english=True)
+        french_message = _build_message(
+            self.fr_texts, self.new_version, is_english=False
+        )
+        english_message = _build_message(
+            self.en_texts, self.new_version, is_english=True
+        )
         full_test_message = f"{french_message}\n\n---\n\n{english_message}"
 
         chunks = _split_message(full_test_message)
@@ -352,7 +360,7 @@ class PatchNoteView(ui.View):
 
         channel = interaction.channel
         if not channel:
-             # Fallback (peu probable)
+            # Fallback (peu probable)
             await interaction.followup.send(
                 "❌ Erreur: Canal introuvable pour le rafraîchissement.", ephemeral=True
             )
@@ -389,8 +397,12 @@ class PatchNoteView(ui.View):
         fr_channel = interaction.guild.get_channel(PARAM.UPDATE_CHANNEL_ID_FR)
         en_channel = interaction.guild.get_channel(PARAM.UPDATE_CHANNEL_ID_EN)
 
-        french_message = _build_message(self.fr_texts, self.new_version, is_english=False)
-        english_message = _build_message(self.en_texts, self.new_version, is_english=True)
+        french_message = _build_message(
+            self.fr_texts, self.new_version, is_english=False
+        )
+        english_message = _build_message(
+            self.en_texts, self.new_version, is_english=True
+        )
 
         # Re-create files for FR
         files_fr = []
@@ -478,7 +490,9 @@ class PatchNoteModal(ui.Modal, title="Déployer un Patch"):
         new_version = self.version_input.value
         raw_message = self.message_input.value
 
-        await followup.edit(content="✨ Traitement du texte (Correction & Traduction)...")
+        await followup.edit(
+            content="✨ Traitement du texte (Correction & Traduction)..."
+        )
 
         original_texts = {
             "changes": raw_message,
@@ -489,7 +503,7 @@ class PatchNoteModal(ui.Modal, title="Déployer un Patch"):
 
         if raw_message and not translated_texts.get("changes"):
             await followup.edit(
-                 content="⚠️ La traduction a échoué. Le message anglais sera incomplet."
+                content="⚠️ La traduction a échoué. Le message anglais sera incomplet."
             )
             await asyncio.sleep(2)
 
@@ -532,7 +546,9 @@ class PatchNoteModal(ui.Modal, title="Déployer un Patch"):
             current_view = view if is_last else None
             current_files = files_objects if is_last else None
 
-            await test_channel.send(content=chunk, files=current_files, view=current_view)
+            await test_channel.send(
+                content=chunk, files=current_files, view=current_view
+            )
 
         await followup.edit(content="🎉 Prévisualisation envoyée dans le canal test !")
 
