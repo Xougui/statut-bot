@@ -1,7 +1,11 @@
 import sys
+import os
 from unittest.mock import AsyncMock, MagicMock, mock_open, patch
 
 import pytest
+
+# Mock environment variable BEFORE module import to avoid logging warning
+os.environ["GEMINI_API"] = "fake_key"
 
 # Mock PARAM and environment variables
 mock_param = MagicMock()
@@ -16,6 +20,7 @@ mock_param.crossmarck = "❌"
 mock_param.in_progress = "⏳"
 mock_param.annonce = "📢"
 mock_param.test = "🧪"
+mock_param.GEMINI_MODEL = "gemini-1.5-flash"
 sys.modules["PARAM"] = mock_param
 
 # Mock google.genai
@@ -33,6 +38,11 @@ from cog.maj import (  # noqa: E402
     _send_and_publish,
     _send_ping,
 )
+
+# Explicitly set the client mock to ensure it's not None
+# The module import might have set it to None if import happened before env var or mocking
+if maj_module.client is None:
+    maj_module.client = MagicMock()
 
 
 @pytest.fixture
@@ -89,6 +99,9 @@ async def test_call_gemini_api_success() -> None:
     mock_response = MagicMock()
     mock_response.text = '{"key": "value"}'
 
+    # Ensure client is mocked
+    maj_module.client = MagicMock()
+
     # Reset mock call count
     maj_module.client.models.generate_content.reset_mock()
     maj_module.client.models.generate_content.return_value = mock_response
@@ -102,6 +115,8 @@ async def test_call_gemini_api_failure_retry() -> None:
     # First call raises exception, second succeeds
     mock_response = MagicMock()
     mock_response.text = '{"success": true}'
+
+    maj_module.client = MagicMock()
 
     maj_module.client.models.generate_content.reset_mock()
     maj_module.client.models.generate_content.side_effect = [
@@ -267,8 +282,27 @@ async def test_update_manager_view_send_prod() -> None:
         patch("cog.maj._send_ping", new_callable=AsyncMock) as mock_ping,
     ):
         # Mock button click
-        callback = view.send_prod.callback
-        await callback(interaction)
+        # Access the callback. Since we're in a test and it's a bound method on the view instance,
+        # but decorated by ui.button, accessing view.send_prod returns the Item (Button).
+        # We need the callback.
+        # But wait, in the previous fix for patch_note, I used `PatchNoteView.send_prod.callback`.
+        # Here `UpdateManagerView.send_prod.callback` should work, but I need to bind it or pass self.
+
+        # However, `view.send_prod` (instance) might already be the Button object.
+        # Button objects store their callback.
+
+        # In this specific test file (which existed before), `view.send_prod` was seemingly working as a function?
+        # Or maybe the test was failing before but I didn't see it (I only saw errors related to client).
+
+        # Let's try to invoke it correctly.
+        # If view.send_prod is a Button, we call its callback.
+
+        if hasattr(view.send_prod, "callback"):
+             # It is an Item
+             await view.send_prod.callback(interaction)
+        else:
+             # It is a function (unlikely with @ui.button)
+             await view.send_prod(interaction)
 
         assert mock_send.call_count == 2  # FR and EN
         assert mock_ping.call_count == 2  # FR and EN
