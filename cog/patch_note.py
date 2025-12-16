@@ -190,9 +190,10 @@ async def _correct_french_text(text_parts: dict) -> dict:
         "Agis comme un correcteur orthographique et grammatical expert. Corrige le texte français suivant. "
         "Règles strictes :\n"
         "1. Réponds uniquement avec un objet JSON valide contenant les clés : 'corrected_changes'.\n"
-        "2. PRÉSERVE scrupuleusement la mise en forme, TOUS les sauts de ligne (\n), et les caractères spéciaux.\n"
-        "3. NE CHANGE PAS les mots techniques, les noms propres, ou les termes que tu ne connais pas.\n\n"
-        f"Changements: {text_parts['changes']}"
+        "2. Le contenu de 'corrected_changes' doit être UNIQUEMENT le texte corrigé, SANS titre, SANS préfixe (comme 'Changements:'), et SANS guillemets supplémentaires.\n"
+        "3. PRÉSERVE scrupuleusement la mise en forme, TOUS les sauts de ligne (\n), et les caractères spéciaux.\n"
+        "4. NE CHANGE PAS les mots techniques, les noms propres, ou les termes que tu ne connais pas.\n\n"
+        f"Texte à corriger :\n{text_parts['changes']}"
     )
     schema = {
         "type": "OBJECT",
@@ -221,10 +222,11 @@ async def _translate_to_english(text_parts: dict) -> dict:
         "Agis comme un traducteur expert du français vers l'anglais. Traduis le texte suivant.\n"
         "Règles strictes :\n"
         "1. Réponds uniquement avec un objet JSON valide contenant les clés : 'changes'.\n"
-        "2. PRÉSERVE scrupuleusement la mise en forme et TOUS les sauts de ligne (\n).\n"
-        "3. NE TRADUIS PAS les mots entre `code`, les variables, ou les emojis Discord (<:...:...>).\n"
-        "4. Conserve les termes techniques inchangés si une traduction directe n'est pas évidente.\n\n"
-        f"Changements originaux: {text_parts['changes']}"
+        "2. Le contenu de 'changes' doit être UNIQUEMENT le texte traduit, SANS titre, SANS préfixe (comme 'Changes:'), et SANS guillemets supplémentaires.\n"
+        "3. PRÉSERVE scrupuleusement la mise en forme et TOUS les sauts de ligne (\n).\n"
+        "4. NE TRADUIS PAS les mots entre `code`, les variables, ou les emojis Discord (<:...:...>).\n"
+        "5. Conserve les termes techniques inchangés si une traduction directe n'est pas évidente.\n\n"
+        f"Texte à traduire :\n{text_parts['changes']}"
     )
     schema = {
         "type": "OBJECT",
