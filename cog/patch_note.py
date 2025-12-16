@@ -172,6 +172,10 @@ async def _call_gemini_api(prompt: str, schema: dict) -> dict | None:
                 logging.warning("Structure de réponse de l'API Gemini inattendue.")
                 return None
         except Exception as e:
+            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                logging.warning("Quota API Gemini atteint (429). Abandon de l'IA pour cette requête.")
+                return None
+
             logging.error(
                 f"Erreur API Gemini (tentative {attempt + 1}/{max_retries}): {e}"
             )
@@ -438,6 +442,9 @@ class PatchNoteModal(ui.Modal, title="Déployer un Patch"):
                 content="✨ Traitement du texte (Correction & Traduction)..."
             )
             fr_message, en_message = await _process_patch_text(raw_message)
+
+        if raw_message and not en_message:
+            en_message = "⚠️ Traduction automatique indisponible (Quota API). Veuillez cliquer sur 'Éditer EN' pour ajouter le texte manuellement."
 
         await followup.edit(content="📤 Envoi de la prévisualisation...")
 
