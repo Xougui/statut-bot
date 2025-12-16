@@ -1,5 +1,6 @@
 import os
 from unittest.mock import AsyncMock, MagicMock, mock_open, patch
+
 import discord
 from discord import ui
 import pytest
@@ -103,10 +104,10 @@ async def test_patch_note_view_send_prod() -> None:
         # that PatchNoteView.send_prod MIGHT be the function in this environment?
 
         if hasattr(PatchNoteView.send_prod, "callback"):
-             await PatchNoteView.send_prod.callback(view, interaction, button)
+            await PatchNoteView.send_prod.callback(view, interaction, button)
         else:
-             # It's just the function?
-             await PatchNoteView.send_prod(view, interaction, button)
+            # It's just the function?
+            await PatchNoteView.send_prod(view, interaction, button)
 
     # Verify
     # Should get channels for FR and EN
