@@ -24,6 +24,7 @@ gemini-2.5-flash-lite-preview-09-2025              Gemini 2.5 Flash-Lite Preview
 gemini-2.5-pro                                     Gemini 2.5 Pro                                          1048576          65536             Stable release (June 17th, 2025) of Gemini 2.5 Pro
 gemini-2.5-pro-preview-tts                         Gemini 2.5 Pro Preview TTS                              8192             16384             Gemini 2.5 Pro Preview TTS
 
+gemini-3-flash-preview                             Gemini 3 Flash Preview                                  1048576          65536             Gemini 3 Flash Preview
 gemini-3-pro-preview                               Gemini 3 Pro Preview                                    1048576          65536             Gemini 3 Pro Preview
 
 gemini-flash-latest                                Gemini Flash Latest                                     1048576          65536             Latest release of Gemini Flash
