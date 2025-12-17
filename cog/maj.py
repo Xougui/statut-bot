@@ -463,16 +463,18 @@ class UpdateManagerView(ui.View):
         for filename, file_bytes in self.files_data:
             files_fr.append(discord.File(io.BytesIO(file_bytes), filename=filename))
 
-        await _send_and_publish(fr_channel, french_message, files_fr)
-        await _send_ping(fr_channel)
+        await _send_and_publish(
+            fr_channel, f"<@&{PARAM.UPDATE_ROLE_ID}>\n{french_message}", files_fr
+        )
 
         # Re-create files for EN
         files_en = []
         for filename, file_bytes in self.files_data:
             files_en.append(discord.File(io.BytesIO(file_bytes), filename=filename))
 
-        await _send_and_publish(en_channel, english_message, files_en)
-        await _send_ping(en_channel)
+        await _send_and_publish(
+            en_channel, f"<@&{PARAM.UPDATE_ROLE_ID}>\n{english_message}", files_en
+        )
 
         await interaction.followup.send(
             "✅ Mise à jour déployée en production !", ephemeral=True
