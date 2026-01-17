@@ -51,7 +51,6 @@ imagen-4.0-fast-generate-001                       Imagen 4 Fast                
 imagen-4.0-ultra-generate-001                      Imagen 4 Ultra                                          480              8192              Vertex served Imagen 4.0 ultra model
 imagen-4.0-ultra-generate-preview-06-06            Imagen 4 Ultra (Preview)                                480              8192              Vertex served Imagen 4.0 ultra model
 
-gemini-2.5-flash-image-preview                     Nano Banana                                             32768            32768             Gemini 2.5 Flash Preview Image
 gemini-2.5-flash-image                             Nano Banana                                             32768            32768             Gemini 2.5 Flash Preview Image
 gemini-3-pro-image-preview                         Nano Banana Pro                                         131072           32768             Gemini 3 Pro Image Preview
 nano-banana-pro-preview                            Nano Banana Pro                                         131072           32768             Gemini 3 Pro Image Preview
