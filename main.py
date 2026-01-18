@@ -87,16 +87,29 @@ status_index = 0
 @tasks.loop(seconds=5)
 async def change_status() -> None:
     global status_index
+    if not bot.is_ready() or bot.is_closed():
+        return
+
     target_bot = bot.get_user(BOT_ID)
+    target_name = target_bot.name if target_bot else "le bot"
+
     statuses = [
-        f"Je surveille {target_bot.name} !",
+        f"Je surveille {target_name} !",
         "Le bot est hors ligne? Je te le dirais!",
     ]
-    await bot.change_presence(
-        status=discord.Status.online,
-        activity=discord.CustomActivity(name=statuses[status_index]),
-    )
-    status_index = (status_index + 1) % len(statuses)
+    try:
+        await bot.change_presence(
+            status=discord.Status.online,
+            activity=discord.CustomActivity(name=statuses[status_index]),
+        )
+        status_index = (status_index + 1) % len(statuses)
+    except Exception:
+        pass
+
+
+@change_status.before_loop
+async def before_change_status() -> None:
+    await bot.wait_until_ready()
 
 
 # ---------------------------------------------------------------------------------------------------------------
