@@ -134,7 +134,7 @@ class Statut(commands.Cog):
         # On initialise avec un statut 'offline' par défaut pour commencer proprement
         embed = discord.Embed(
             title=f"{OFFLINE_EMOJI}・**Bot hors ligne**",
-            description="Le bot **Lyxios** est **hors ligne**.\n\n> Ne vous inquiétez pas, le bot reviendra en ligne !\n> Check ça pour savoir si le bot est `online` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi\n-# Merci de votre patience.",
+            description="Le bot **Lyxios** est **hors ligne**.\n\n> Ne vous inquiétez pas, le bot reviendra en ligne !\n> Check ça pour savoir si le bot est `online` avant que je le dise ! https://status.xouxou-hosting.fr\n-# Merci de votre patience.",
             color=COLOR_OFFLINE,
         )
         embed.set_footer(text="Initialisation du statut...")
@@ -157,12 +157,12 @@ class Statut(commands.Cog):
         embed_builders = {
             Status.ONLINE: lambda: discord.Embed(
                 title=f"{ONLINE_EMOJI}・**Bot en ligne**",
-                description="Le bot **Lyxios** est **en ligne** et toutes ses commandes et modules sont opérationnels !\n> Check ça pour savoir si le bot est `offline` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi .",
+                description="Le bot **Lyxios** est **en ligne** et toutes ses commandes et modules sont opérationnels !\n> Check ça pour savoir si le bot est `offline` avant que je le dise ! https://status.xouxou-hosting.fr .",
                 color=COLOR_ONLINE,
             ),
             Status.OFFLINE: lambda: discord.Embed(
                 title=f"{OFFLINE_EMOJI}・**Bot hors ligne**",
-                description="Le bot **Lyxios** est **hors ligne**.\n\n> Ne vous inquiétez pas, le bot reviendra en ligne !\n> Check ça pour savoir si le bot est `online` avant que je le dise ! https://stats.uptimerobot.com/0izT1Nyywi\n-# Merci de votre patience.",
+                description="Le bot **Lyxios** est **hors ligne**.\n\n> Ne vous inquiétez pas, le bot reviendra en ligne !\n> Check ça pour savoir si le bot est `online` avant que je le dise ! https://status.xouxou-hosting.fr\n-# Merci de votre patience.",
                 color=COLOR_OFFLINE,
             ),
             Status.MAINTENANCE: lambda: discord.Embed(
