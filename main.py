@@ -29,6 +29,7 @@ EXTENSIONS = [
     "cog.maj",  # Assure-toi que le chemin est correct (ex: 'cogs.maj' si c'est dans un dossier 'cogs')
     "cog.patch_note",
     "cog.version",
+    "cog.monitoring",
 ]
 
 
