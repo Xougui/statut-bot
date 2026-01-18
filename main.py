@@ -23,6 +23,9 @@ import pytz
 
 import PARAM  # Importe les variables de configuration depuis le fichier PARAM.py
 
+if False:
+    import google_genai  # noqa: F401
+
 # Importation des cogs
 EXTENSIONS = [
     "cog.statut",
