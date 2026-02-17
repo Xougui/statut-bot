@@ -1,16 +1,9 @@
 ID du Modèle                                       Nom d'affichage                                         Input Token      Output Token      Description
 -------------------------------------------------- ------------------------------------------------------- ---------------- ----------------- --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-embedding-001                                      Embedding 001                                           2048             1                 Obtain a distributed representation of a text.
-embedding-gecko-001                                Embedding Gecko                                         1024             1                 Obtain a distributed representation of a text.
-text-embedding-004                                 Text Embedding 004                                      2048             1                 Obtain a distributed representation of a text.
-
 gemini-2.0-flash                                   Gemini 2.0 Flash                                        1048576          8192              Gemini 2.0 Flash
 gemini-2.0-flash-001                               Gemini 2.0 Flash 001                                    1048576          8192              Stable version of Gemini 2.0 Flash, our fast and versatile multimodal model for scaling across diverse tasks, released in January of 2025.
-gemini-2.0-flash-exp                               Gemini 2.0 Flash Experimental                           1048576          8192              Gemini 2.0 Flash Experimental
 gemini-2.0-flash-lite                              Gemini 2.0 Flash-Lite                                   1048576          8192              Gemini 2.0 Flash-Lite
 gemini-2.0-flash-lite-001                          Gemini 2.0 Flash-Lite 001                               1048576          8192              Stable version of Gemini 2.0 Flash-Lite
-gemini-2.0-flash-lite-preview                      Gemini 2.0 Flash-Lite Preview                           1048576          8192              Preview release (February 5th, 2025) of Gemini 2.0 Flash-Lite
-gemini-2.0-flash-lite-preview-02-05                Gemini 2.0 Flash-Lite Preview 02-05                     1048576          8192              Preview release (February 5th, 2025) of Gemini 2.0 Flash-Lite
 
 gemini-2.5-computer-use-preview-10-2025            Gemini 2.5 Computer Use Preview 10-2025                 131072           65536             Gemini 2.5 Computer Use Preview 10-2025
 gemini-2.5-flash                                   Gemini 2.5 Flash                                        1048576          65536             Stable version of Gemini 2.5 Flash, our mid-size multimodal model that supports up to 1 million tokens, released in June of 2025.
@@ -32,8 +25,6 @@ gemini-flash-lite-latest                           Gemini Flash-Lite Latest     
 gemini-pro-latest                                  Gemini Pro Latest                                       1048576          65536             Latest release of Gemini Pro
 
 gemini-embedding-001                               Gemini Embedding 001                                    2048             1                 Obtain a distributed representation of a text.
-gemini-embedding-exp                               Gemini Embedding Experimental                           8192             1                 Obtain a distributed representation of a text.
-gemini-embedding-exp-03-07                         Gemini Embedding Experimental 03-07                     8192             1                 Obtain a distributed representation of a text.
 
 gemini-exp-1206                                    Gemini Experimental 1206                                1048576          65536             Experimental release (March 25th, 2025) of Gemini 2.5 Pro
 gemini-robotics-er-1.5-preview                     Gemini Robotics-ER 1.5 Preview                          1048576          65536             Gemini Robotics-ER 1.5 Preview
