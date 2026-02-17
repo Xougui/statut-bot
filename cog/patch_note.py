@@ -266,7 +266,7 @@ def _build_message(texts: dict, version: str, is_english: bool) -> str:
 class EditPatchModal(ui.Modal):
     """Modal pour éditer le texte du patch note (FR ou EN)."""
 
-    def __init__(self, texts: dict, is_english: bool, view: "PatchNoteView") -> None:
+    def __init__(self, texts: dict, is_english: bool, view: PatchNoteView) -> None:
         title = (
             "Éditer Patch Note (Anglais)"
             if is_english

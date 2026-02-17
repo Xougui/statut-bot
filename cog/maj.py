@@ -322,7 +322,7 @@ class EditUpdateModal(ui.Modal):
     """Modal pour éditer le texte de la mise à jour (FR ou EN)."""
 
     def __init__(
-        self, texts: dict, is_english: bool, view: "UpdateManagerView"
+        self, texts: dict, is_english: bool, view: UpdateManagerView
     ) -> None:
         title = "Éditer texte (Anglais)" if is_english else "Éditer texte (Français)"
         super().__init__(title=title)
@@ -516,7 +516,7 @@ class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
         try:
             with open("data/version.json") as f:
                 self.version_number.default = json.load(f).get("version", "1.0.0")
-        except (FileNotFoundError, json.JSONDecodeError):
+        except FileNotFoundError, json.JSONDecodeError:
             self.version_number.default = "1.0.0"
 
     update_name = ui.TextInput(

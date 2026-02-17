@@ -382,7 +382,7 @@ class Statut(commands.Cog):
             if self._message_id:
                 try:
                     message = await channel.fetch_message(self._message_id)
-                except (discord.NotFound, discord.Forbidden):
+                except discord.NotFound, discord.Forbidden:
                     log.warning(
                         f"Message de statut (ID: {self._message_id}) introuvable. Création d'un nouveau..."
                     )
@@ -567,7 +567,7 @@ class Statut(commands.Cog):
                         log.info(
                             f"Statut initialisé à partir du message existant : {self._last_known_status.name}"
                         )
-                except (discord.NotFound, discord.Forbidden):
+                except discord.NotFound, discord.Forbidden:
                     log.warning(
                         f"Message de statut (ID: {self._message_id}) non trouvé lors de l'initialisation. Un nouveau sera créé."
                     )
