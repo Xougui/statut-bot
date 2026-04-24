@@ -15,9 +15,9 @@ from google.genai import types
 
 import PARAM
 
-# Configurez le logging
-
 load_dotenv()
+
+log = logging.getLogger("discord")
 
 # Récupération de la clé API Gemini depuis les variables d'environnement
 gemini_api_key = os.getenv("GEMINI_API")
@@ -27,7 +27,7 @@ if gemini_api_key:
     client = genai.Client(api_key=gemini_api_key)
 else:
     client = None
-    logging.warning("GEMINI_API key not found. AI features will be disabled.")
+    log.warning("GEMINI_API key not found. AI features will be disabled.")
 
 # --- Helpers ---
 
@@ -84,10 +84,10 @@ async def _send_ping(channel: discord.TextChannel) -> None:
     try:
         await channel.send(f"<@&{PARAM.UPDATE_ROLE_ID}>")
     except Exception as e:
-        logging.error(f"Erreur lors du ping dans {channel.name}: {e}")
+        log.error(f"Erreur lors du ping dans {channel.name}: {e}")
 
 
-async def _send_and_publish(
+async def _send_and_publish(  # noqa: C901
     channel: discord.TextChannel,
     content: str,
     files: list[discord.File] | None = None,
@@ -95,7 +95,7 @@ async def _send_and_publish(
 ) -> None:
     """Envoie un message, le publie si nécessaire, et ajoute une réaction."""
     if not channel:
-        logging.error("Tentative d'envoi à un canal non valide.")
+        log.error("Tentative d'envoi à un canal non valide.")
         if followup_message:
             await followup_message.edit(content="❌ Erreur: Le canal est introuvable.")
         return
@@ -107,22 +107,21 @@ async def _send_and_publish(
         for i, chunk in enumerate(chunks):
             current_files = files if i == len(chunks) - 1 else None
 
-            msg = await channel.send(content=chunk, files=current_files)
+            if current_files is not None:
+                msg = await channel.send(content=chunk, files=current_files)
+            else:
+                msg = await channel.send(content=chunk)
 
             if channel.is_news():
                 try:
                     await msg.publish()
-                    logging.info(
-                        f"Message publié dans le canal d'annonces {channel.name}."
-                    )
+                    log.info(f"Message publié dans le canal d'annonces {channel.name}.")
                 except discord.Forbidden:
-                    logging.error(
+                    log.error(
                         f"Permissions insuffisantes pour publier dans {channel.name}."
                     )
                 except Exception as e:
-                    logging.error(
-                        f"Erreur lors de la publication dans {channel.name}: {e}"
-                    )
+                    log.error(f"Erreur lors de la publication dans {channel.name}: {e}")
 
             try:
                 verify_emoji = discord.PartialEmoji(
@@ -130,10 +129,10 @@ async def _send_and_publish(
                 )
                 await msg.add_reaction(verify_emoji)
             except Exception as e:
-                logging.error(f"Impossible d'ajouter la réaction: {e}")
+                log.error(f"Impossible d'ajouter la réaction: {e}")
 
     except discord.Forbidden:
-        logging.error(
+        log.error(
             f"Permissions insuffisantes pour envoyer des messages dans {channel.name}."
         )
         if followup_message:
@@ -141,7 +140,7 @@ async def _send_and_publish(
                 content=f"❌ Erreur: Permissions insuffisantes pour le canal {channel.name}."
             )
     except Exception as e:
-        logging.error(
+        log.error(
             f"Erreur inattendue lors de l'envoi dans {channel.name}: {e}", exc_info=True
         )
         if followup_message:
@@ -156,7 +155,7 @@ async def _send_and_publish(
 async def _call_gemini_api(prompt: str, schema: dict) -> dict | None:
     """Appelle l'API Gemini avec une nouvelle tentative en cas d'échec."""
     if not client:
-        logging.error("Client Gemini non initialisé (Clé API manquante ?).")
+        log.error("Client Gemini non initialisé (Clé API manquante ?).")
         return None
 
     max_retries = 3
@@ -177,21 +176,19 @@ async def _call_gemini_api(prompt: str, schema: dict) -> dict | None:
                 try:
                     return json.loads(response.text)
                 except (ValueError, json.JSONDecodeError) as e:
-                    logging.error(
+                    log.error(
                         f"Error parsing JSON from Gemini: {e}\nResponse received: {response.text}"
                     )
                     return None
             else:
-                logging.warning("Structure de réponse de l'API Gemini inattendue.")
+                log.warning("Structure de réponse de l'API Gemini inattendue.")
                 return None
 
         except Exception as e:
-            logging.error(
-                f"Erreur API Gemini (tentative {attempt + 1}/{max_retries}): {e}"
-            )
+            log.error(f"Erreur API Gemini (tentative {attempt + 1}/{max_retries}): {e}")
             await asyncio.sleep(2**attempt)
 
-    logging.error(f"Échec de l'appel à l'API Gemini après {max_retries} tentatives.")
+    log.error(f"Échec de l'appel à l'API Gemini après {max_retries} tentatives.")
     return None
 
 
@@ -227,16 +224,15 @@ async def _correct_french_text(text_parts: dict) -> dict:
     }
     corrected_data = await _call_gemini_api(prompt, schema)
     if corrected_data:
-        logging.info("Correction française réussie.")
+        log.info("Correction française réussie.")
+        raw_changes = corrected_data.get("corrected_changes") or text_parts["changes"]
         return {
-            "title": corrected_data.get("corrected_title", text_parts["title"]),
-            "changes": corrected_data.get(
-                "corrected_changes", text_parts["changes"]
-            ).replace("\\n", "\n"),
-            "intro": corrected_data.get("corrected_intro", text_parts["intro"]),
-            "outro": corrected_data.get("corrected_outro", text_parts["outro"]),
+            "title": corrected_data.get("corrected_title") or text_parts["title"],
+            "changes": raw_changes.replace("\\n", "\n"),
+            "intro": corrected_data.get("corrected_intro") or text_parts["intro"],
+            "outro": corrected_data.get("corrected_outro") or text_parts["outro"],
         }
-    logging.warning("Échec de la correction, utilisation du texte original.")
+    log.warning("Échec de la correction, utilisation du texte original.")
     return text_parts
 
 
@@ -267,14 +263,15 @@ async def _translate_to_english(text_parts: dict) -> dict:
     }
     translated_data = await _call_gemini_api(prompt, schema)
     if translated_data:
-        logging.info("Traduction anglaise réussie.")
+        log.info("Traduction anglaise réussie.")
+        raw_changes = translated_data.get("changes") or ""
         return {
-            "title": translated_data.get("title", ""),
-            "changes": translated_data.get("changes", "").replace("\\n", "\n"),
-            "intro": translated_data.get("intro", ""),
-            "outro": translated_data.get("outro", ""),
+            "title": translated_data.get("title") or "",
+            "changes": raw_changes.replace("\\n", "\n"),
+            "intro": translated_data.get("intro") or "",
+            "outro": translated_data.get("outro") or "",
         }
-    logging.error("Échec de la traduction.")
+    log.error("Échec de la traduction.")
     return {"title": "", "changes": "", "intro": "", "outro": ""}
 
 
@@ -387,7 +384,7 @@ class UpdateManagerView(ui.View):
         self.files_data = files_data  # List of (filename, bytes)
         self.original_interaction = original_interaction
 
-    async def refresh_message(self, interaction: discord.Interaction) -> None:
+    async def refresh_message(self, interaction: discord.Interaction) -> None:  # noqa: C901
         """Met à jour le message de test avec les nouvelles données."""
         french_message = _build_message(self.fr_texts, is_english=False)
         english_message = _build_message(self.en_texts, is_english=True)
@@ -432,12 +429,26 @@ class UpdateManagerView(ui.View):
             )
             return
 
+        if not isinstance(channel, discord.TextChannel):
+            await interaction.followup.send(
+                "❌ Erreur: Le canal n'est pas un salon textuel.", ephemeral=True
+            )
+            return
+
         for i, chunk in enumerate(chunks):
             is_last = i == len(chunks) - 1
-            current_view = self if is_last else None
             current_files = get_files() if is_last else None
 
-            await channel.send(content=chunk, files=current_files, view=current_view)
+            if is_last:
+                if current_files is not None:
+                    await channel.send(content=chunk, files=current_files, view=self)
+                else:
+                    await channel.send(content=chunk, view=self)
+            else:
+                if current_files is not None:
+                    await channel.send(content=chunk, files=current_files)
+                else:
+                    await channel.send(content=chunk)
 
     @ui.button(label="Envoyer Production", style=discord.ButtonStyle.green)
     async def send_prod(
@@ -445,9 +456,16 @@ class UpdateManagerView(ui.View):
     ) -> None:
         await interaction.response.defer()
 
+        if not interaction.guild:
+            await interaction.followup.send(
+                "❌ Erreur: Serveur introuvable.", ephemeral=True
+            )
+            return
+
         # Disable buttons to prevent double click
         for child in self.children:
-            child.disabled = True
+            if isinstance(child, ui.Button):
+                child.disabled = True
         await interaction.edit_original_response(view=self)
 
         fr_channel = interaction.guild.get_channel(PARAM.UPDATE_CHANNEL_ID_FR)
@@ -461,18 +479,20 @@ class UpdateManagerView(ui.View):
         for filename, file_bytes in self.files_data:
             files_fr.append(discord.File(io.BytesIO(file_bytes), filename=filename))
 
-        await _send_and_publish(
-            fr_channel, f"<@&{PARAM.UPDATE_ROLE_ID}>\n{french_message}", files_fr
-        )
+        if isinstance(fr_channel, discord.TextChannel):
+            await _send_and_publish(
+                fr_channel, f"<@&{PARAM.UPDATE_ROLE_ID}>\n{french_message}", files_fr
+            )
 
         # Re-create files for EN
         files_en = []
         for filename, file_bytes in self.files_data:
             files_en.append(discord.File(io.BytesIO(file_bytes), filename=filename))
 
-        await _send_and_publish(
-            en_channel, f"<@&{PARAM.UPDATE_ROLE_ID}>\n{english_message}", files_en
-        )
+        if isinstance(en_channel, discord.TextChannel):
+            await _send_and_publish(
+                en_channel, f"<@&{PARAM.UPDATE_ROLE_ID}>\n{english_message}", files_en
+            )
 
         await interaction.followup.send(
             "✅ Mise à jour déployée en production !", ephemeral=True
@@ -501,8 +521,10 @@ class UpdateManagerView(ui.View):
         )
         # Disable buttons
         for child in self.children:
-            child.disabled = True
-        await interaction.message.edit(view=self)
+            if isinstance(child, ui.Button):
+                child.disabled = True
+        if interaction.message:
+            await interaction.message.edit(view=self)
 
 
 class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
@@ -514,7 +536,7 @@ class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
         try:
             with open("data/version.json") as f:
                 self.version_number.default = json.load(f).get("version", "1.0.0")
-        except FileNotFoundError, json.JSONDecodeError:
+        except (FileNotFoundError, json.JSONDecodeError):
             self.version_number.default = "1.0.0"
 
     update_name = ui.TextInput(
@@ -536,7 +558,7 @@ class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
         label="Message de conclusion (facultatif)", max_length=500, required=False
     )
 
-    async def on_submit(self, interaction: discord.Interaction) -> None:
+    async def on_submit(self, interaction: discord.Interaction) -> None:  # noqa: C901
         """Gère la soumission du modal."""
         await interaction.response.send_message(
             "🚀 Préparation de l'annonce...", ephemeral=True
@@ -570,7 +592,7 @@ class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
                 data = await attachment.read()
                 files_data.append((attachment.filename, data))
             except Exception as e:
-                logging.error(f"Error reading attachment {attachment.filename}: {e}")
+                log.error(f"Error reading attachment {attachment.filename}: {e}")
 
         # Prepare files for the test message
         files_objects = []
@@ -587,9 +609,13 @@ class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
             content="📤 Envoi de la prévisualisation sur le canal test..."
         )
 
+        if not interaction.guild:
+            await followup_message.edit(content="❌ Erreur: Serveur introuvable.")
+            return
+
         test_channel = interaction.guild.get_channel(PARAM.UPDATE_CHANNEL_ID_TEST)
 
-        if not test_channel:
+        if not isinstance(test_channel, discord.TextChannel):
             await followup_message.edit(
                 content="❌ Erreur: Le canal de test est introuvable. Vérifiez l'ID dans PARAM.py."
             )
@@ -604,12 +630,20 @@ class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
         for i, chunk in enumerate(chunks):
             # On attache la vue et les fichiers uniquement au dernier message
             is_last = i == len(chunks) - 1
-            current_view = view if is_last else None
             current_files = files_objects if is_last else None
 
-            await test_channel.send(
-                content=chunk, files=current_files, view=current_view
-            )
+            if is_last:
+                if current_files is not None:
+                    await test_channel.send(
+                        content=chunk, files=current_files, view=view
+                    )
+                else:
+                    await test_channel.send(content=chunk, view=view)
+            else:
+                if current_files is not None:
+                    await test_channel.send(content=chunk, files=current_files)
+                else:
+                    await test_channel.send(content=chunk)
 
         await followup_message.edit(
             content="🎉 Prévisualisation envoyée ! Vérifiez le canal test."
@@ -619,9 +653,9 @@ class UpdateModal(ui.Modal, title="Nouvelle Mise à Jour"):
         try:
             with open("data/version.json", "w") as f:
                 json.dump({"version": self.version_number.value}, f, indent=2)
-            logging.info(f"Version mise à jour vers : {self.version_number.value}")
+            log.info(f"Version mise à jour vers : {self.version_number.value}")
         except OSError as e:
-            logging.error(f"Impossible de sauvegarder la version : {e}")
+            log.error(f"Impossible de sauvegarder la version : {e}")
 
 
 class ManagementCog(commands.Cog):
@@ -654,7 +688,7 @@ class ManagementCog(commands.Cog):
         elif isinstance(error, app_commands.CommandOnCooldown):
             message = f"Commande en cooldown. Réessayez dans {error.retry_after:.1f}s."
         else:
-            logging.error(f"Erreur inattendue dans /update: {error}")
+            log.error(f"Erreur inattendue dans /update: {error}")
 
         if interaction.response.is_done():
             await interaction.followup.send(message, ephemeral=True)

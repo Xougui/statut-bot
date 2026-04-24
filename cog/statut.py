@@ -87,7 +87,7 @@ class Statut(commands.Cog):
         self._load_state()
         self._automatic_check_task.start()
 
-    def cog_unload(self) -> None:
+    async def cog_unload(self) -> None:
         self._automatic_check_task.cancel()
 
     # --- Gestion de l'état persistant ---
@@ -240,7 +240,7 @@ class Statut(commands.Cog):
             return True
         except discord.HTTPException as e:
             if e.status == 429:
-                retry_after = e.retry_after or 5.0
+                retry_after = getattr(e, "retry_after", None) or 5.0
                 log.warning(f"Rate limited (channel name): waiting {retry_after:.2f}s.")
                 if interaction is not None and progress_log is not None:
                     with contextlib.suppress(discord.HTTPException):
@@ -334,7 +334,7 @@ class Statut(commands.Cog):
         await self._update_status_logic()
 
     @_automatic_check_task.error
-    async def _on_task_error(self, error: Exception) -> None:
+    async def _on_task_error(self, error: BaseException) -> None:
         """Gère les erreurs non-catchées de la tâche automatique."""
         log.error(
             f"Erreur non gérée dans _automatic_check_task: {error}", exc_info=error
@@ -424,7 +424,7 @@ class Statut(commands.Cog):
             if self._message_id:
                 try:
                     message = await channel.fetch_message(self._message_id)
-                except discord.NotFound, discord.Forbidden:
+                except (discord.NotFound, discord.Forbidden):
                     log.warning(
                         f"Message de statut (ID: {self._message_id}) introuvable. Création d'un nouveau..."
                     )
@@ -618,7 +618,7 @@ class Statut(commands.Cog):
                             log.info(
                                 f"Statut initialisé à partir du nom du salon : {self._last_known_status.name}"
                             )
-                except discord.NotFound, discord.Forbidden:
+                except (discord.NotFound, discord.Forbidden):
                     log.warning(
                         f"Message de statut (ID: {self._message_id}) non trouvé lors de l'initialisation. Un nouveau sera créé."
                     )
