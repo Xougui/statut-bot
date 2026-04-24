@@ -10,24 +10,29 @@ gemini-2.5-flash                                   Gemini 2.5 Flash             
 gemini-2.5-flash-native-audio-latest               Gemini 2.5 Flash Native Audio Latest                    131072           8192              Latest release of Gemini 2.5 Flash Native Audio
 gemini-2.5-flash-native-audio-preview-09-2025      Gemini 2.5 Flash Native Audio Preview 09-2025           131072           8192              Gemini 2.5 Flash Native Audio Preview 09-2025
 gemini-2.5-flash-native-audio-preview-12-2025      Gemini 2.5 Flash Native Audio Preview 12-2025           131072           8192              Gemini 2.5 Flash Native Audio Preview 12-2025
-gemini-2.5-flash-preview-09-2025                   Gemini 2.5 Flash Preview Sep 2025                       1048576          65536             Gemini 2.5 Flash Preview Sep 2025
 gemini-2.5-flash-preview-tts                       Gemini 2.5 Flash Preview TTS                            8192             16384             Gemini 2.5 Flash Preview TTS
 gemini-2.5-flash-lite                              Gemini 2.5 Flash-Lite                                   1048576          65536             Stable version of Gemini 2.5 Flash-Lite, released in July of 2025
-gemini-2.5-flash-lite-preview-09-2025              Gemini 2.5 Flash-Lite Preview Sep 2025                  1048576          65536             Preview release (Septempber 25th, 2025) of Gemini 2.5 Flash-Lite
 gemini-2.5-pro                                     Gemini 2.5 Pro                                          1048576          65536             Stable release (June 17th, 2025) of Gemini 2.5 Pro
 gemini-2.5-pro-preview-tts                         Gemini 2.5 Pro Preview TTS                              8192             16384             Gemini 2.5 Pro Preview TTS
 
 gemini-3-flash-preview                             Gemini 3 Flash Preview                                  1048576          65536             Gemini 3 Flash Preview
 gemini-3-pro-preview                               Gemini 3 Pro Preview                                    1048576          65536             Gemini 3 Pro Preview
+gemini-3.1-flash-lite-preview                      Gemini 3.1 Flash Lite Preview                           1048576          65536             Gemini 3.1 Flash Lite Preview
+gemini-3.1-flash-live-preview                      Gemini 3.1 Flash Live Preview                           131072           65536             Gemini 3.1 Flash Live Preview
+gemini-3.1-flash-tts-preview                       Gemini 3.1 Flash TTS Preview                            8192             16384             Gemini 3.1 Flash TTS Preview
+gemini-3.1-pro-preview                             Gemini 3.1 Pro Preview                                  1048576          65536             Gemini 3.1 Pro Preview
+gemini-3.1-pro-preview-customtools                 Gemini 3.1 Pro Preview Custom Tools                     1048576          65536             Gemini 3.1 Pro Preview optimized for custom tool usage
 
 gemini-flash-latest                                Gemini Flash Latest                                     1048576          65536             Latest release of Gemini Flash
 gemini-flash-lite-latest                           Gemini Flash-Lite Latest                                1048576          65536             Latest release of Gemini Flash-Lite
 gemini-pro-latest                                  Gemini Pro Latest                                       1048576          65536             Latest release of Gemini Pro
 
 gemini-embedding-001                               Gemini Embedding 001                                    2048             1                 Obtain a distributed representation of a text.
+gemini-embedding-2                                 Gemini Embedding 2                                      8192             1                 Obtain a distributed representation of multimodal content.
+gemini-embedding-2-preview                         Gemini Embedding 2 Preview                              8192             1                 Obtain a distributed representation of multimodal content.
 
-gemini-exp-1206                                    Gemini Experimental 1206                                1048576          65536             Experimental release (March 25th, 2025) of Gemini 2.5 Pro
 gemini-robotics-er-1.5-preview                     Gemini Robotics-ER 1.5 Preview                          1048576          65536             Gemini Robotics-ER 1.5 Preview
+gemini-robotics-er-1.6-preview                     Gemini Robotics-ER 1.6 Preview                          131072           65536             Gemini Robotics-ER 1.6 Preview
 
 gemma-3-12b-it                                     Gemma 3 12B                                             32768            8192
 gemma-3-1b-it                                      Gemma 3 1B                                              32768            8192
@@ -35,14 +40,15 @@ gemma-3-27b-it                                     Gemma 3 27B                  
 gemma-3-4b-it                                      Gemma 3 4B                                              32768            8192
 gemma-3n-e2b-it                                    Gemma 3n E2B                                            8192             2048
 gemma-3n-e4b-it                                    Gemma 3n E4B                                            8192             2048
+gemma-4-26b-a4b-it                                 Gemma 4 26B A4B IT                                      262144           32768             Gemma 4 26B A4B IT
+gemma-4-31b-it                                     Gemma 4 31B IT                                          262144           32768             Gemma 4 31B IT
 
 imagen-4.0-generate-001                            Imagen 4                                                480              8192              Vertex served Imagen 4.0 model
-imagen-4.0-generate-preview-06-06                  Imagen 4 (Preview)                                      480              8192              Vertex served Imagen 4.0 model
 imagen-4.0-fast-generate-001                       Imagen 4 Fast                                           480              8192              Vertex served Imagen 4.0 Fast model
 imagen-4.0-ultra-generate-001                      Imagen 4 Ultra                                          480              8192              Vertex served Imagen 4.0 ultra model
-imagen-4.0-ultra-generate-preview-06-06            Imagen 4 Ultra (Preview)                                480              8192              Vertex served Imagen 4.0 ultra model
 
 gemini-2.5-flash-image                             Nano Banana                                             32768            32768             Gemini 2.5 Flash Preview Image
+gemini-3.1-flash-image-preview                     Nano Banana 2                                           65536            65536             Gemini 3.1 Flash Image Preview.
 gemini-3-pro-image-preview                         Nano Banana Pro                                         131072           32768             Gemini 3 Pro Image Preview
 nano-banana-pro-preview                            Nano Banana Pro                                         131072           32768             Gemini 3 Pro Image Preview
 
@@ -51,6 +57,11 @@ veo-3.0-generate-001                               Veo 3                        
 veo-3.0-fast-generate-001                          Veo 3 fast                                              480              8192              Veo 3 fast
 veo-3.1-generate-preview                           Veo 3.1                                                 480              8192              Veo 3.1
 veo-3.1-fast-generate-preview                      Veo 3.1 fast                                            480              8192              Veo 3.1 fast
+veo-3.1-lite-generate-preview                      Veo 3.1 lite                                            480              8192              Veo 3.1 lite
 
+deep-research-max-preview-04-2026                  Deep Research Max Preview (Apr-21-2026)                 131072           65536             Preview release (April 21st, 2026) of Deep Research Max
+deep-research-preview-04-2026                      Deep Research Preview (Apr-21-2026)                     131072           65536             Preview release (April 21th, 2026) of Deep Research
 deep-research-pro-preview-12-2025                  Deep Research Pro Preview (Dec-12-2025)                 131072           65536             Preview release (December 12th, 2025) of Deep Research Pro
+lyria-3-clip-preview                               Lyria 3 Clip Preview                                    1048576          65536             Lyria 3 30s model Preview
+lyria-3-pro-preview                                Lyria 3 Pro Preview                                     1048576          65536             Lyria 3 Pro Preview
 aqa                                                Model that performs Attributed Question Answering.      7168             1024              Model trained to return answers to questions that are grounded in provided sources, along with estimating answerable probability.

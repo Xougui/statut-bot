@@ -321,9 +321,7 @@ def _build_message(texts: dict, is_english: bool) -> str:
 class EditUpdateModal(ui.Modal):
     """Modal pour éditer le texte de la mise à jour (FR ou EN)."""
 
-    def __init__(
-        self, texts: dict, is_english: bool, view: UpdateManagerView
-    ) -> None:
+    def __init__(self, texts: dict, is_english: bool, view: UpdateManagerView) -> None:
         title = "Éditer texte (Anglais)" if is_english else "Éditer texte (Français)"
         super().__init__(title=title)
         self.texts = texts
@@ -656,7 +654,7 @@ class ManagementCog(commands.Cog):
         elif isinstance(error, app_commands.CommandOnCooldown):
             message = f"Commande en cooldown. Réessayez dans {error.retry_after:.1f}s."
         else:
-            logging.error(f"Erreur inattendue dans /update: {error}", exc_info=True)
+            logging.error(f"Erreur inattendue dans /update: {error}")
 
         if interaction.response.is_done():
             await interaction.followup.send(message, ephemeral=True)

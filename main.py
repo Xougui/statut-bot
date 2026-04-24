@@ -3,6 +3,7 @@ import concurrent.futures  # Pour exécuter des tâches de manière synchrone da
 import datetime
 import logging
 import os
+from pathlib import Path
 import platform
 import sys
 from threading import Thread
@@ -71,13 +72,15 @@ tz = pytz.timezone("Europe/Paris")
 previous_status = None
 
 
-def is_owner(ctx) -> bool:  # N802: Function name `isOwner` should be lowercase
-    return ctx.message.author.id in owners
+def is_owner(
+    ctx: commands.Context,
+) -> bool:  # N802: Function name `isOwner` should be lowercase
+    return ctx.author.id in owners
 
 
 @bot.command()
 @commands.check(is_owner)
-async def start(ctx, secondes=3) -> None:
+async def start(_ctx: commands.Context, secondes: int = 3) -> None:
     change_status.change_interval(seconds=secondes)
 
 
@@ -122,7 +125,7 @@ bot_start_time = datetime.datetime.now()
 executor = concurrent.futures.ThreadPoolExecutor()
 
 
-def get_directory_size_bytes_sync(path) -> int:
+def get_directory_size_bytes_sync(path: str | Path) -> int:
     """Calcule la taille d'un répertoire de manière synchrone."""
     total_size = 0
     if not os.path.exists(path):
@@ -141,7 +144,7 @@ def get_directory_size_bytes_sync(path) -> int:
     return total_size
 
 
-async def get_directory_size_async(path) -> int:
+async def get_directory_size_async(path: str | Path) -> int:
     """Exécute la fonction de taille de répertoire de manière asynchrone."""
     return await asyncio.get_running_loop().run_in_executor(
         executor, get_directory_size_bytes_sync, path
