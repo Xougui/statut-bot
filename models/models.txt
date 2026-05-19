@@ -17,6 +17,7 @@ gemini-2.5-pro-preview-tts                         Gemini 2.5 Pro Preview TTS   
 
 gemini-3-flash-preview                             Gemini 3 Flash Preview                                  1048576          65536             Gemini 3 Flash Preview
 gemini-3-pro-preview                               Gemini 3 Pro Preview                                    1048576          65536             Gemini 3 Pro Preview
+gemini-3.1-flash-lite                              Gemini 3.1 Flash Lite                                   1048576          65536             Gemini 3.1 Flash Lite
 gemini-3.1-flash-lite-preview                      Gemini 3.1 Flash Lite Preview                           1048576          65536             Gemini 3.1 Flash Lite Preview
 gemini-3.1-flash-live-preview                      Gemini 3.1 Flash Live Preview                           131072           65536             Gemini 3.1 Flash Live Preview
 gemini-3.1-flash-tts-preview                       Gemini 3.1 Flash TTS Preview                            8192             16384             Gemini 3.1 Flash TTS Preview
@@ -34,12 +35,6 @@ gemini-embedding-2-preview                         Gemini Embedding 2 Preview   
 gemini-robotics-er-1.5-preview                     Gemini Robotics-ER 1.5 Preview                          1048576          65536             Gemini Robotics-ER 1.5 Preview
 gemini-robotics-er-1.6-preview                     Gemini Robotics-ER 1.6 Preview                          131072           65536             Gemini Robotics-ER 1.6 Preview
 
-gemma-3-12b-it                                     Gemma 3 12B                                             32768            8192
-gemma-3-1b-it                                      Gemma 3 1B                                              32768            8192
-gemma-3-27b-it                                     Gemma 3 27B                                             131072           8192
-gemma-3-4b-it                                      Gemma 3 4B                                              32768            8192
-gemma-3n-e2b-it                                    Gemma 3n E2B                                            8192             2048
-gemma-3n-e4b-it                                    Gemma 3n E4B                                            8192             2048
 gemma-4-26b-a4b-it                                 Gemma 4 26B A4B IT                                      262144           32768             Gemma 4 26B A4B IT
 gemma-4-31b-it                                     Gemma 4 31B IT                                          262144           32768             Gemma 4 31B IT
 
